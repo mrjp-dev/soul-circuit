@@ -63,6 +63,11 @@ sysinfo.txt
 *.unitypackage
 *.app
 
+# Vendored Asset Store packages ship .unitypackage files inside Assets/ (for
+# example the URP material variants under Abiogenesis3d). Those are source, not
+# build output, so they must survive the *.unitypackage rule above.
+!/Game/Tesseract/Assets/**/*.unitypackage
+
 # Crashlytics generated file
 crashlytics-build.properties
 
