@@ -293,8 +293,8 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
         //shouldGround = (canJump && isGrounded);
 
-        minVerticalSpeed = Mathf.Min(minVerticalSpeed, rbComponent.velocity.y);
-        maxVerticalSpeed = Mathf.Max(maxVerticalSpeed, rbComponent.velocity.y);
+        minVerticalSpeed = Mathf.Min(minVerticalSpeed, rbComponent.linearVelocity.y);
+        maxVerticalSpeed = Mathf.Max(maxVerticalSpeed, rbComponent.linearVelocity.y);
 
         desiredHorizontalVelocity = maxHorizontalVelocity;
         desiredHorizontalSpeed = maxHorizontalVelocity.magnitude;
@@ -349,7 +349,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
         if (rayHit)
         {
-            Vector3 rbVelocity = rbComponent.velocity;
+            Vector3 rbVelocity = rbComponent.linearVelocity;
             float rayDirVelocity = Vector3.Dot(rayDir, rbVelocity);
 
             groundDelta = hitInfo.distance - floatDistance;
@@ -375,8 +375,8 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void CheckFall()
     {
-        verticalSpeed = rbComponent.velocity.y;
-        isFalling = rbComponent.velocity.y < -0.5f;
+        verticalSpeed = rbComponent.linearVelocity.y;
+        isFalling = rbComponent.linearVelocity.y < -0.5f;
 
         if (isFalling)
             shouldGround = true;
@@ -544,7 +544,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
                     currentForce = actionForce;
 
 
-                    rbComponent.velocity = Vector3.zero;
+                    rbComponent.linearVelocity = Vector3.zero;
                     StartOtherForceTimer(actionForce.Duration);
                     rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
                 }
@@ -561,7 +561,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
                 currentForce = actionForce;
 
-                rbComponent.velocity = Vector3.zero;
+                rbComponent.linearVelocity = Vector3.zero;
                 StartOtherForceTimer(actionForce.Duration);
                 rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
 
@@ -661,7 +661,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
         goalHorizontalVelocity = Vector3.MoveTowards(goalHorizontalVelocity, maxHorizontalVelocity, accel * Time.fixedDeltaTime);
 
-        Vector3 neededAccel = (goalHorizontalVelocity - new Vector3(rbComponent.velocity.x, 0f, rbComponent.velocity.z)) / Time.fixedDeltaTime;
+        Vector3 neededAccel = (goalHorizontalVelocity - new Vector3(rbComponent.linearVelocity.x, 0f, rbComponent.linearVelocity.z)) / Time.fixedDeltaTime;
         float maxAccel = maxAccelerationForce * maxAccelerationForceFactorFromDot.Evaluate(velocityDot);
         neededAccel = Vector3.ClampMagnitude(neededAccel, maxAccel);
 
