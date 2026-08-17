@@ -85,6 +85,9 @@ crashlytics-build.properties
 # FMOD generated cache inside the Unity project
 /Game/Tesseract/Assets/Plugins/FMOD/Cache/
 
+# FMOD editor log written into the Unity project root
+fmod_editor.log
+
 # ---------------------------------------------------------------------------
 # OS
 # ---------------------------------------------------------------------------
