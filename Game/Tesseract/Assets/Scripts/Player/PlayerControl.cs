@@ -95,6 +95,9 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     // Menu inputs
     private InputAction inputMenuCancel;
 
+    // Owns pause/inventory/zoom/cancel routing. Not serialized: built in Awake.
+    private SystemInputRouter systemInput;
+
     #region Movement Variables
 
     [Header("Horizontal Movement Factors")]
@@ -214,10 +217,17 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         //hurtboxCollider.gameObject.SetActive(false);
         //hitboxCollider.gameObject.SetActive(false);
 
+        systemInput = new SystemInputRouter(
+            inputMenuOptions,
+            inputInventory,
+            inputCameraZoomIn,
+            inputCameraZoomOut,
+            inputMenuCancel,
+            new EventManagerInputSink());
+
         jumpDelay = 0.25f;
         jumpDelayTimer = 0f;
 
-        Physics.IgnoreCollision(interactCollider, rbColliderComponent, true);
         Physics.IgnoreCollision(interactCollider, rbColliderComponent, true);
 
         data.InitializeDataIfNull();
@@ -225,35 +235,37 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void OnEnable()
     {
-        EventManager.current.OnPlayerDeath += TriggerDeath;
-        EventManager.current.OnPlayerRestore += data.RestoreStats;
+        EventManager.Current.OnPlayerDeath += TriggerDeath;
+        EventManager.Current.OnPlayerRestore += data.RestoreStats;
+
+        // Input subscriptions belong here rather than in Start so they pair with
+        // OnDisable. InputActions live on the PlayerInput asset, not on this
+        // GameObject, so handlers left attached survive the player's destruction and
+        // stack up on the next scene load, firing once per stale subscription.
+        inputJump.performed += TriggerJump;
+        inputAct1.performed += TriggerPrimaryAction;
+        inputAct2.performed += TriggerSecondaryAction;
+        inputInteraction.performed += TriggerInteraction;
+
+        systemInput.Enable();
     }
 
     private void OnDisable()
     {
-        EventManager.current.OnPlayerDeath -= TriggerDeath;
-        EventManager.current.OnPlayerRestore -= data.RestoreStats;
+        EventManager.Current.OnPlayerDeath -= TriggerDeath;
+        EventManager.Current.OnPlayerRestore -= data.RestoreStats;
+
+        inputJump.performed -= TriggerJump;
+        inputAct1.performed -= TriggerPrimaryAction;
+        inputAct2.performed -= TriggerSecondaryAction;
+        inputInteraction.performed -= TriggerInteraction;
+
+        systemInput.Disable();
     }
 
     public void TriggerDeath()
     {
         Debug.Log("Player Died!");
-    }
-
-    private void Start()
-    {
-
-        // Subscribe corresponding methods to the input that triggers them
-        inputJump.performed += TriggerJump;
-        inputAct1.performed += TriggerPrimaryAction;
-        inputAct2.performed += TriggerSecondaryAction;
-        inputInteraction.performed += TriggerInteraction;
-        inputMenuOptions.performed += TriggerPause;
-        inputInventory.performed += TriggerInventory;
-        inputCameraZoomIn.performed += TriggerCameraZoomIn;
-        inputCameraZoomOut.performed += TriggerCameraZoomOut;
-
-        inputMenuCancel.performed += TriggerMenuCancel;
     }
 
     #endregion
@@ -266,19 +278,11 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         horizontalDirection = inputMove.ReadValue<Vector2>();
         isPressingJump = inputJump.IsPressed();
 
-        // DEBUG: drain/add health
-        if (Keyboard.current.pKey.wasPressedThisFrame)
-            ApplyDamage();
-        if (Keyboard.current.oKey.wasPressedThisFrame)
-            IncreaseMaxHealth();
-        if (Keyboard.current.iKey.wasPressedThisFrame)
-            IncreaseCurrentHealth();
-        if (Keyboard.current.vKey.wasPressedThisFrame)
-        {
-            inputComponent.SwitchCurrentActionMap("Player");
-            Debug.Log("input changed");
-        }
-            
+#if UNITY_EDITOR
+        // Editor-only cheats on P/O/I/V. Excluded from builds so players cannot
+        // trigger them and so the per-frame Keyboard polling costs nothing shipped.
+        HandleDebugKeys();
+#endif
 
         frameTime = Time.deltaTime;
     }
@@ -473,7 +477,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
             if (currentInteractableTag.HasTag("Item"))
                 Debug.Log("Interacted with item!");// Do stuff
             else
-                DialogueManager.current.StartDialogue(currentInteractable);
+                DialogueManager.Current.StartDialogue(currentInteractable);
         }
     }
 
@@ -594,49 +598,8 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     /* TriggerPause pauses the game if the pause button has been pressed
      */
 
-    private void TriggerPause(InputAction.CallbackContext context)
-    {
-        if (context.performed)
-        {
-            EventManager.current.Pause();
-        }
-    }
-
-    // TriggerInventory opens the inventory if the inventory button has been pressed
-    private void TriggerInventory(InputAction.CallbackContext context)
-    {
-        if(context.performed)
-        {
-            EventManager.current.OpenMenu(1);
-        }
-    }
-
-    // TriggerZoomIn zooms in to the next level of zoom is possible
-    private void TriggerCameraZoomIn(InputAction.CallbackContext context)
-    {
-        if(context.performed)
-        {
-            EventManager.current.CameraZoomIn();
-        }
-    }
-
-    // TriggerZoomOut zooms out to the next level of zoom is possible
-    private void TriggerCameraZoomOut(InputAction.CallbackContext context)
-    {
-        if(context.performed)
-        {
-            EventManager.current.CameraZoomOut();
-        }
-    }
-
-        // TriggerMenu Cancel cancels current menu if possible
-    private void TriggerMenuCancel(InputAction.CallbackContext context)
-    {
-        if (context.performed)
-        {
-            EventManager.current.Back();
-        }
-    }
+    // Pause, inventory, camera zoom, and menu cancel are handled by SystemInputRouter.
+    // They are bound to the player's PlayerInput component but are not player actions.
 
     #endregion
 
@@ -710,6 +673,24 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     #endregion
 
     #region Testing
+#if UNITY_EDITOR
+
+    private void HandleDebugKeys()
+    {
+        if (Keyboard.current == null) return;
+
+        if (Keyboard.current.pKey.wasPressedThisFrame)
+            ApplyDamage();
+        if (Keyboard.current.oKey.wasPressedThisFrame)
+            IncreaseMaxHealth();
+        if (Keyboard.current.iKey.wasPressedThisFrame)
+            IncreaseCurrentHealth();
+        if (Keyboard.current.vKey.wasPressedThisFrame)
+        {
+            inputComponent.SwitchCurrentActionMap("Player");
+            Debug.Log("input changed");
+        }
+    }
 
     private void ApplyDamage()
     {
@@ -725,6 +706,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         data.Health++;
     }
 
+#endif
     #endregion
 
     #region Saving & Loading

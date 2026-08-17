@@ -11,10 +11,10 @@ public class HealthBarDisplay : MonoBehaviour
 
     private void OnEnable()
     {
-        if (EventManager.current != null)
+        if (EventManager.Current != null)
         {
-            EventManager.current.OnPlayerDrawHealth += DrawUnits;
-            EventManager.current.OnGameLoaded += DrawUnits;
+            EventManager.Current.OnPlayerDrawHealth += DrawUnits;
+            EventManager.Current.OnGameLoaded += DrawUnits;
         }
         else
             Debug.LogError("Event Manager not found");
@@ -22,8 +22,8 @@ public class HealthBarDisplay : MonoBehaviour
 
     private void OnDisable()
     {
-        EventManager.current.OnPlayerDrawHealth -= DrawUnits;
-        EventManager.current.OnGameLoaded -= DrawUnits;
+        EventManager.Current.OnPlayerDrawHealth -= DrawUnits;
+        EventManager.Current.OnGameLoaded -= DrawUnits;
     }
 
     private void Start()

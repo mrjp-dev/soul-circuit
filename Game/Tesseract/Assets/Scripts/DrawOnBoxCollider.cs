@@ -1,7 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using UnityEditor;
 using UnityEngine;
 
 [ExecuteAlways]
@@ -31,12 +27,6 @@ public class DrawOnBoxCollider : MonoBehaviour
         }
     }
 
-    // Update is called once per frame
-    void Update()
-    {
-
-    }
-
     private void DrawGizmosOnRunTime(Color color)
     {
         if (boxCollider != null && draw)
@@ -60,12 +50,13 @@ public class DrawOnBoxCollider : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        if(boxCollider.enabled)
-        {
-            Color c = colliderColor;
-            c.a = colorTransparency;
-            DrawGizmosOnRunTime(c);
-        }
-        
+        // boxCollider stays null when boxColliderToDrawOn is assigned, and is null
+        // before Start runs at all, so this has to be guarded the same way
+        // DrawGizmosOnRunTime guards it.
+        if (boxCollider == null || !boxCollider.enabled) return;
+
+        Color c = colliderColor;
+        c.a = colorTransparency;
+        DrawGizmosOnRunTime(c);
     }
 }

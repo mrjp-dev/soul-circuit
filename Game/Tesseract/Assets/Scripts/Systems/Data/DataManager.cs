@@ -18,7 +18,7 @@ public class DataManager : MonoBehaviour
     private FileDataHandler dataHandler;
     private string currentDataProfileID = "";
 
-    public static DataManager current { get; private set; }
+    public static DataManager Current { get; private set; }
     public string CurrentDataProfileID { get => currentDataProfileID; }
 
     public GameData GetGameData()
@@ -31,8 +31,8 @@ public class DataManager : MonoBehaviour
         if (disableDataPersistence)
             Debug.LogWarning("Data persistence is disabled, no data will be loaded or saved!");
 
-        if (current == null)
-            current = this;
+        if (Current == null)
+            Current = this;
         else
         {
             Debug.LogWarning("Data Manager instance already exists, newest one will be destroyed");
@@ -74,7 +74,7 @@ public class DataManager : MonoBehaviour
 
         if (this.gameData == null)
         {
-            EventManager.current.NoSaveData();
+            EventManager.Current.NoSaveData();
             Debug.LogWarning("No data was found, please start a new game before trying to save");
             return;
         }
@@ -91,14 +91,14 @@ public class DataManager : MonoBehaviour
 
         dataHandler.Save(gameData, currentDataProfileID);
 
-        EventManager.current.GameSaved();
+        EventManager.Current.GameSaved();
     }
 
     public void LoadGame()
     {
         if (disableDataPersistence)
         {
-            EventManager.current.NoDataPersistence();
+            EventManager.Current.NoDataPersistence();
             return;
         }
 
@@ -106,7 +106,7 @@ public class DataManager : MonoBehaviour
 
         if(this.gameData == null)
         {
-            EventManager.current.NoLoadData();
+            EventManager.Current.NoLoadData();
             Debug.LogWarning("No data was found, please start a new game before trying to load");
             return;
         }
@@ -115,7 +115,7 @@ public class DataManager : MonoBehaviour
         {
             dataPersistentObj.LoadData(gameData);
         }
-        EventManager.current.GameLoaded();
+        EventManager.Current.GameLoaded();
     }
 
     public void LoadWithDataProfileID(string dataProfileID)

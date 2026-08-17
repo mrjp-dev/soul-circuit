@@ -17,16 +17,16 @@ public class SelectCubeControl : MonoBehaviour
 
     private void OnEnable()
     {
-        if (DialogueManager.current != null)
-            DialogueManager.current.OnWritingLine += IsWritingDialogue;
+        if (DialogueManager.Current != null)
+            DialogueManager.Current.OnWritingLine += IsWritingDialogue;
         else
             Debug.LogWarning("Dialogue Manager not found");
     }
 
     private void OnDisable()
     {
-        if(DialogueManager.current != null)
-            DialogueManager.current.OnWritingLine -= IsWritingDialogue;
+        if(DialogueManager.Current != null)
+            DialogueManager.Current.OnWritingLine -= IsWritingDialogue;
     }
 
     private void Update()
@@ -36,9 +36,9 @@ public class SelectCubeControl : MonoBehaviour
             currentSelection = EventSystem.current.currentSelectedGameObject;
             ChangePosition(currentSelection.transform);
 
-            if (DialogueManager.current != null)
+            if (DialogueManager.Current != null)
             {
-                if (EventSystem.current.currentSelectedGameObject == DialogueManager.current.ProgressButton || EventSystem.current.currentSelectedGameObject == DialogueManager.current.ForceLineButton)
+                if (EventSystem.current.currentSelectedGameObject == DialogueManager.Current.ProgressButton || EventSystem.current.currentSelectedGameObject == DialogueManager.Current.ForceLineButton)
                     SetDialogueVisibility();
                 else
                     SetVisibility(true);

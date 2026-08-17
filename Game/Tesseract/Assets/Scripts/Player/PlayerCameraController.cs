@@ -39,14 +39,14 @@ public class PlayerCameraController : MonoBehaviour
 
     private void OnEnable()
     {
-        EventManager.current.OnCameraZoomIn += ZoomIn;
-        EventManager.current.OnCameraZoomOut += ZoomOut;
+        EventManager.Current.OnCameraZoomIn += ZoomIn;
+        EventManager.Current.OnCameraZoomOut += ZoomOut;
     }
 
     private void OnDisable()
     {
-        EventManager.current.OnCameraZoomIn -= ZoomIn;
-        EventManager.current.OnCameraZoomOut -= ZoomOut;
+        EventManager.Current.OnCameraZoomIn -= ZoomIn;
+        EventManager.Current.OnCameraZoomOut -= ZoomOut;
     }
 
     private void Awake()

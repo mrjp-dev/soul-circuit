@@ -9,7 +9,7 @@ using UnityEngine.EventSystems;
 
 public class DialogueManager : MonoBehaviour, IDataPersistence
 {
-    public static DialogueManager current { get; private set; }
+    public static DialogueManager Current { get; private set; }
 
     [SerializeField] private GameObject[] choices;
     [SerializeField] private GameObject progressButton;
@@ -78,8 +78,8 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
     private void Awake()
     {
-        if (current == null)
-            current = this;
+        if (Current == null)
+            Current = this;
         else
             Debug.LogError("Another instance of Dialogue Manager already exists");
 
@@ -94,13 +94,13 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
     public void OnEnable()
     {
-        if (current != null)
+        if (Current != null)
         {
             OnWritingLine += DisplayChoices;
             OnWritingLine += SetProgressButtonActive;
             OnWritingLine += SetProgressButtonVisibility;
 
-            EventManager.current.OnNoDataPersistence += LoadDataDefaults;
+            EventManager.Current.OnNoDataPersistence += LoadDataDefaults;
         }
         else
             Debug.LogError("Dialogue Manager not found");
@@ -112,7 +112,7 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
         OnWritingLine -= SetProgressButtonActive;
         OnWritingLine += SetProgressButtonVisibility;
 
-        EventManager.current.OnNoDataPersistence -= LoadDataDefaults;
+        EventManager.Current.OnNoDataPersistence -= LoadDataDefaults;
     }
 
     private void Start()
@@ -146,7 +146,7 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
             return;
         }
 
-        EventManager.current.OpenMenu(4);
+        EventManager.Current.OpenMenu(4);
         globalDialogueVariables.StartListening(currentDialogue);
 
         textDialogueSource.text = "";
@@ -159,7 +159,7 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
     public void EndDialogue()
     {
-        EventManager.current.Back();
+        EventManager.Current.Back();
         textDialogue.text = "";
         globalDialogueVariables.StopListening(currentDialogue);
         currentDialogue = null;
@@ -245,11 +245,11 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
                     break;
 
                 case saveTag:
-                    DataManager.current.SaveGame();
+                    DataManager.Current.SaveGame();
                     break;
                 
                 case restoreTag:
-                    EventManager.current.PlayerRestored();
+                    EventManager.Current.PlayerRestored();
                     break;
 
                 default:

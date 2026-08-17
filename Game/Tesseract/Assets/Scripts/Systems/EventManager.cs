@@ -6,7 +6,7 @@ using UnityEngine.InputSystem.UI;
 
 public class EventManager : MonoBehaviour
 {
-    public static EventManager current { get; private set; }
+    public static EventManager Current { get; private set; }
 
     public event Action<bool> OnInteractable;
 
@@ -30,8 +30,8 @@ public class EventManager : MonoBehaviour
 
     private void Awake()
     {
-        if (current == null)
-            current = this;
+        if (Current == null)
+            Current = this;
         else
             Debug.LogError("Event Manager already exists");
     }

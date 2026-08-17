@@ -35,10 +35,10 @@ public class MenuManager : Menu
 
     private void OnEnable()
     {
-        if (EventManager.current != null)
+        if (EventManager.Current != null)
         {
-            EventManager.current.OnOpenMenu += MenuManagement;
-            EventManager.current.OnBack += CloseCurrentMenu;
+            EventManager.Current.OnOpenMenu += MenuManagement;
+            EventManager.Current.OnBack += CloseCurrentMenu;
         }
         else
             Debug.LogError("Event Manager not found");
@@ -46,8 +46,8 @@ public class MenuManager : Menu
 
     private void OnDisable()
     {
-        EventManager.current.OnOpenMenu -= MenuManagement;
-        EventManager.current.OnBack -= CloseCurrentMenu;
+        EventManager.Current.OnOpenMenu -= MenuManagement;
+        EventManager.Current.OnBack -= CloseCurrentMenu;
     }
 
     private void Start()

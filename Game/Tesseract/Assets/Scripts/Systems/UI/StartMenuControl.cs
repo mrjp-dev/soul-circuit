@@ -29,7 +29,7 @@ public class StartMenuControl : Menu
     {
         saveDataProfiles = menuList[1].GetComponentsInChildren<SaveDataProfile>();
 
-        if (string.IsNullOrEmpty(DataManager.current.CurrentDataProfileID))
+        if (string.IsNullOrEmpty(DataManager.Current.CurrentDataProfileID))
             EventSystem.current.SetSelectedGameObject(newGameButton.gameObject);
         else
             EventSystem.current.SetSelectedGameObject(continueButton.gameObject);
@@ -39,12 +39,12 @@ public class StartMenuControl : Menu
     }
     private void OnEnable()
     {
-        EventManager.current.OnNoLoadData += DestroyContinueLoad;
+        EventManager.Current.OnNoLoadData += DestroyContinueLoad;
     }
 
     private void OnDisable()
     {
-        EventManager.current.OnNoLoadData -= DestroyContinueLoad;
+        EventManager.Current.OnNoLoadData -= DestroyContinueLoad;
     }
 
     private void Start()
@@ -65,7 +65,7 @@ public class StartMenuControl : Menu
     public void ContinueGame()
     {
         ToggleMainMenuButtons(false);
-        SceneManager.LoadSceneAsync(DataManager.current.GetGameData().lastActiveSceneName);
+        SceneManager.LoadSceneAsync(DataManager.Current.GetGameData().lastActiveSceneName);
     }
 
     public void LoadGame()
@@ -159,7 +159,7 @@ public class StartMenuControl : Menu
         if(state)
         {
             SetSelection(saveSlot1.gameObject);
-            Dictionary<string, GameData> gameDataProfiles = DataManager.current.GetAllDataProfiles();
+            Dictionary<string, GameData> gameDataProfiles = DataManager.Current.GetAllDataProfiles();
 
             foreach (SaveDataProfile save in saveDataProfiles)
             {
@@ -179,19 +179,19 @@ public class StartMenuControl : Menu
     {
         ToggleMainMenuButtons(false);
 
-        DataManager.current.LoadWithDataProfileID(save.GetDataProfileID());
+        DataManager.Current.LoadWithDataProfileID(save.GetDataProfileID());
 
         if (!hasSelectedLoadGame)
             if (save.HasData)
             {
                 Debug.LogWarning("Overwriting data");
-                DataManager.current.NewGame();
+                DataManager.Current.NewGame();
             }
             else
-                DataManager.current.NewGame();
-        //if(DataManager.current.GetGameData())
+                DataManager.Current.NewGame();
+        //if(DataManager.Current.GetGameData())
 
 
-        ChangeScene(DataManager.current.GetGameData().lastActiveSceneName);
+        ChangeScene(DataManager.Current.GetGameData().lastActiveSceneName);
     }
 }

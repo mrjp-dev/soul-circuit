@@ -73,9 +73,9 @@ public class PlayerData : ScriptableObject, IDataPersistence
         set
         {
             health = Mathf.Clamp(value, 0, maxHealth);
-            EventManager.current.PlayerDrawHealth(); // Draw health UI every time health is modified
+            EventManager.Current.PlayerDrawHealth(); // Draw health UI every time health is modified
             if (health <= 0)
-                EventManager.current.PlayerDeath(); // Trigger player's death if health's value is 0
+                EventManager.Current.PlayerDeath(); // Trigger player's death if health's value is 0
         }
     }
     public int MaxHealth
@@ -84,7 +84,7 @@ public class PlayerData : ScriptableObject, IDataPersistence
         set
         {
             maxHealth = value;
-            EventManager.current.PlayerDrawHealth(); // Draw health UI every time maximum health is modified
+            EventManager.Current.PlayerDrawHealth(); // Draw health UI every time maximum health is modified
         }
     }
     public float JumpBoost { get => jumpBoost; set => jumpBoost = value; }
