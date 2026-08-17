@@ -35,12 +35,24 @@ Banks live in `Assets/StreamingAssets` (`Master.bank`, `Master.strings.bank`) an
 from `../../Audio/soul_circuit/soul_circuit.fspro`. `FMODStudioSettings.asset` holds that
 path and is **not** shipped in the FMOD package, so preserve it across any FMOD upgrade.
 
-Banks can be rebuilt headlessly:
+Banks can be rebuilt headlessly with `fmodstudiocl.exe`, which is the CLI binary
+(`fmodstudio.exe` is the GUI):
 
 ```bash
-"C:/Program Files/FMOD SoundSystem/FMOD Studio 2.03.14/fmodstudio.exe" -build \
+"C:/Program Files/FMOD SoundSystem/FMOD Studio 2.03.14/fmodstudiocl.exe" -build \
   "E:/Projects/Soul Circuit/Audio/soul_circuit/soul_circuit.fspro"
 ```
+
+**One exception, and it is a hard one.** The CLI cannot migrate a project between FMOD major
+versions. Loading a 2.02-era `.fspro` under 2.03 fails with:
+
+> Project Load Error: Project is out of date and requires project migration. Please load the
+> project using the Studio UI tool to migrate the project to the latest version
+
+There is no `-migrate` flag; the full option list is `-build`, `-shared-audio-source-dir`,
+`-banks`, `-platforms`, `-export-guids`, `-script`, `-diagnostic`, `-ignore-warnings`,
+`-log-dir`, `-log-max-file-size`, `-working-dir`, `-help`. So the first open after a major
+version change has to happen in the GUI, once. Every build after that can be headless.
 
 FMOD requires the integration and the Studio that built the banks to agree on major.minor.
 
