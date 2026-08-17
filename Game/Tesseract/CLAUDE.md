@@ -118,6 +118,39 @@ you follow the pattern:
   This project has zero `ScriptableRenderPass` and zero `ScriptableRendererFeature`
   subclasses, so that does not currently apply.
 
+## Console state
+
+A clean batchmode run on 6000.5.8f1 reports **0 errors and 0 warnings**.
+
+One known message remains and is not worth fixing:
+
+```
+Assembly reference Packages/com.unity.cinemachine/Editor/Samples/ExposeHDRPInternals/
+HDRP-Editor-ref.asmref has no target assembly definition
+```
+
+Cinemachine 3.1.7 ships an HDRP sample whose assembly reference cannot resolve in a URP
+project. It lives in `Library/PackageCache`, so edits are wiped on reimport; silencing it
+would mean embedding the whole package into `Packages/` and giving up UPM updates. The
+occurrence count varies with how many compile passes a run does (10 in one run, 3 in
+another), which is why it is not a useful signal to count.
+
+Vendored **sample and demo folders** caused most of this migration's breakage. Four were
+removed, all unreferenced by game content:
+
+| Folder | Broke |
+|---|---|
+| `Abiogenesis3d/UPixelator/Example` | `using UnityEngine.XR.WSA`, VR module removed in 6.5 |
+| `TextMesh Pro/Examples & Extras` | TMP UVs became `Vector4[]` in ugui 2.5.0 |
+| `Plugins/FMOD/addons/ResonanceAudio` | abandoned upstream since Aug 2022 |
+| `Ink/Demos` | `story.ink` compile timeout, 5 console messages |
+
+Re-importing any of those vendor packages brings the folders back. Remove them again.
+
+If `'UnityEditor.ProBuilder.ProBuilderEditor' is missing the class attribute
+'ExtensionOfNativeClass'` reappears, it is a stale saved window layout holding a ProBuilder
+5.2.2 editor window. Reset with `Window > Layouts > Default`. Cosmetic.
+
 ## Conventions
 
 Match the file you are editing. Do not reformat untouched lines. Do not edit anything under
