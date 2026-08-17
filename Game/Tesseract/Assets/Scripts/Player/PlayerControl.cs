@@ -70,7 +70,9 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     [SerializeField] private float floatDistance;
     [SerializeField] private float rayDistance;
 
-    public RaycastHit hitInfo;
+    // Scratch space for the ground raycast. RaycastHit is not [Serializable], so a public
+    // field here was never actually serialized by Unity despite looking like it was.
+    private RaycastHit hitInfo;
     public LayerMask interactLayer;
     public LayerMask groundLayer;
     public LayerMask damageLayer;

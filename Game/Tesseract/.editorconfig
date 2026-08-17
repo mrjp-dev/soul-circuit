@@ -1,0 +1,23 @@
+root = true
+
+# ---------------------------------------------------------------------------
+# First-party game code keeps every diagnostic on.
+# ---------------------------------------------------------------------------
+
+[*.cs]
+indent_style = space
+indent_size = 4
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+# ---------------------------------------------------------------------------
+# Vendored third-party code
+#
+# Warning suppression for vendored folders is NOT done here. Unity does not pass
+# .editorconfig to the C# compiler (no -analyzerconfig appears in any assembly's
+# response file under Library/Bee), so dotnet_diagnostic severity entries have no
+# effect on a Unity build. Suppression lives in a csc.rsp beside each vendored
+# .asmdef instead, which Unity does honour.
+# ---------------------------------------------------------------------------
