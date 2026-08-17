@@ -1,0 +1,84 @@
+[gd_scene load_steps=13 format=3 uid="uid://b6bw2lnciiwpu"]
+
+[ext_resource type="Script" path="res://Code/Scripts/PlayerControl.cs" id="1_1tjpj"]
+[ext_resource type="Texture2D" uid="uid://c11qcgym5jwdq" path="res://Assets/Sprites/spritesheet_heisse.png" id="1_v013c"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ped8u"]
+atlas = ExtResource("1_v013c")
+region = Rect2(0, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_fwch3"]
+atlas = ExtResource("1_v013c")
+region = Rect2(32, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sujfh"]
+atlas = ExtResource("1_v013c")
+region = Rect2(64, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_etsuc"]
+atlas = ExtResource("1_v013c")
+region = Rect2(96, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jtdou"]
+atlas = ExtResource("1_v013c")
+region = Rect2(128, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_5p1bi"]
+atlas = ExtResource("1_v013c")
+region = Rect2(160, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1l2gj"]
+atlas = ExtResource("1_v013c")
+region = Rect2(192, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dqvkm"]
+atlas = ExtResource("1_v013c")
+region = Rect2(224, 0, 32, 32)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_1r3at"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ped8u")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_fwch3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sujfh")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_etsuc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jtdou")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_5p1bi")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1l2gj")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dqvkm")
+}],
+"loop": true,
+"name": &"idle",
+"speed": 8.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ee0sc"]
+
+[node name="Player" type="CharacterBody2D"]
+script = ExtResource("1_1tjpj")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_1r3at")
+animation = &"idle"
+autoplay = "idle"
+frame_progress = 0.249221
+
+[node name="PhysicsCollider2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 6)
+shape = SubResource("RectangleShape2D_ee0sc")
+debug_color = Color(0.4232, 0.92, 0.2576, 0.419608)

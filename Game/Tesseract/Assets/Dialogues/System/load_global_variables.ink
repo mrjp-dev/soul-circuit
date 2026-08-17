@@ -1,0 +1,1 @@
+ INCLUDE global_variables.ink

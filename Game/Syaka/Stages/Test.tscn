@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3 uid="uid://dswry242l6e6k"]
+
+[ext_resource type="Script" path="res://Code/Resources/PlayerStats.cs" id="1_wwglg"]
+[ext_resource type="PackedScene" uid="uid://b6bw2lnciiwpu" path="res://Actors/player.tscn" id="1_yvl32"]
+
+[node name="Test" type="Node2D"]
+script = ExtResource("1_wwglg")
+
+[node name="Player" parent="." instance=ExtResource("1_yvl32")]
+
+[node name="Camera2D" type="Camera2D" parent="."]
