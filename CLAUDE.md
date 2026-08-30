@@ -1,7 +1,10 @@
-# Tesseract
+# Soul Circuit
 
-Unity game project for Soul Circuit. The repository root is one level up at
-`E:\Projects\Soul Circuit\`, which also holds the FMOD Studio project in `Audio/`.
+Repository root. Holds the Unity project in `Game/Tesseract/`, the FMOD Studio project in
+`Audio/`, art sources in `Art/`, and design documents in `Planning/`.
+
+Unless a path is written from the repo root, paths in the Unity sections below are relative
+to `Game/Tesseract/`.
 
 ## Environment
 
@@ -156,3 +159,18 @@ If `'UnityEditor.ProBuilder.ProBuilderEditor' is missing the class attribute
 Match the file you are editing. Do not reformat untouched lines. Do not edit anything under
 `Assets/Plugins/FMOD`, `Assets/Ink`, or `Assets/Abiogenesis3d`: those are vendored and any
 change is lost on the next update.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `mrjp-dev/soul-circuit`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical roles, unchanged: `needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
