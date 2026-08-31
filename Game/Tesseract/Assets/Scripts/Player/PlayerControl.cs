@@ -209,13 +209,14 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         rbColliderComponent = transform.GetComponent<CapsuleCollider>();
 
         boxColliders = transform.GetComponentsInChildren<BoxCollider>();
-        
-        interactCollider = boxColliders[0];
-        //hurtboxCollider = boxColliders[1];
-        //hitboxCollider = boxColliders[2];
-        
-        //hurtboxCollider.gameObject.SetActive(false);
-        //hitboxCollider.gameObject.SetActive(false);
+
+        // Resolved by name rather than by index. GetComponentsInChildren order follows the
+        // hierarchy, so indexing meant reordering the player's children silently rebound
+        // this to a different collider, and an empty array threw out of Awake.
+        interactCollider = FindCollider("Collider_Interact");
+
+        // Combat is not built yet. Collider_Hurtbox and Collider_Hitbox exist in the
+        // scene but stay unbound on purpose; wire them here when combat lands.
 
         systemInput = new SystemInputRouter(
             inputMenuOptions,
@@ -231,6 +232,15 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         Physics.IgnoreCollision(interactCollider, rbColliderComponent, true);
 
         data.InitializeDataIfNull();
+    }
+
+    private BoxCollider FindCollider(string colliderName)
+    {
+        foreach (BoxCollider c in boxColliders)
+            if (c.gameObject.name == colliderName) return c;
+
+        Debug.LogError($"PlayerControl: no child BoxCollider named '{colliderName}'.", this);
+        return null;
     }
 
     private void OnEnable()
@@ -261,6 +271,12 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         inputInteraction.performed -= TriggerInteraction;
 
         systemInput.Disable();
+    }
+
+    private void OnDestroy()
+    {
+        // Otherwise Current keeps pointing at a destroyed player between scene loads.
+        if (Current == this) Current = null;
     }
 
     public void TriggerDeath()

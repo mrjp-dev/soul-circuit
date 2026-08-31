@@ -16,6 +16,24 @@ only the vocabulary the codebase needs, so names in issues, tests, and refactors
 
 Each has a paired `ScriptableObject` for data: `NPData`, `NPCData`, `NPOData`.
 
+An **item** is a non-playable object the player can pick up. Pickup is not implemented
+yet: the branch in `PlayerControl.TriggerInteraction` logs and falls through.
+
+`NPCData` carries allegiance as three independent booleans (`isHostile`, `isFriendly`,
+`isNeutral`), so a character can currently be more than one at once.
+
+## How a non-playable is recognised
+
+Three mechanisms answer three different questions. They are not competing classifications.
+
+| Mechanism | Question | Where |
+|---|---|---|
+| Type hierarchy | What is it? | `NonPlayable` and subclasses, plus their `NPData` |
+| Unity's built-in `GameObject.tag` | Can it be approached? | `ToggleInteractable` writes `"Interactable"`; the player's trigger reads it |
+| `CustomTag` string list | What can it do? | `"NPC"` turns to face the player, `"Item"` is picked up |
+
+Only `"NPC"` is applied in any scene today.
+
 ## Playable characters
 
 More than one character is playable, each with a distinct combat style.

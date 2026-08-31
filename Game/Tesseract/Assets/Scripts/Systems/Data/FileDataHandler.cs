@@ -8,15 +8,17 @@ public class FileDataHandler
     private string dataFileDirectoryPath = "";
     private string dataFileName = "";
 
-    private bool useEncryption = false;
+    // Not encryption. XOR against a key compiled into the binary, which deters casual
+    // save-file editing and nothing else. Do not store anything sensitive here.
+    private bool useObfuscation = false;
     private DateTime mostRecentDate;
-    private readonly string encryptionCodeWord = "among_us";
+    private readonly string obfuscationKey = "among_us";
 
     public FileDataHandler(string fileDir, string fileName, bool encrypt)
     {
         dataFileDirectoryPath = fileDir;
         dataFileName = fileName;
-        useEncryption = encrypt;
+        useObfuscation = encrypt;
     }
 
     public GameData Load(string dataProfileID)
@@ -37,9 +39,9 @@ public class FileDataHandler
 
                 dataToLoad = reader.ReadToEnd();
 
-                if (useEncryption)
+                if (useObfuscation)
                 {
-                    dataToLoad = EncryptDecrypt(dataToLoad);
+                    dataToLoad = Obfuscate(dataToLoad);
                 }
 
                 storedData = JsonUtility.FromJson<GameData>(dataToLoad);
@@ -64,9 +66,9 @@ public class FileDataHandler
 
             string dataToStore = JsonUtility.ToJson(data, true);
 
-            if (useEncryption)
+            if (useObfuscation)
             {
-                dataToStore = EncryptDecrypt(dataToStore);
+                dataToStore = Obfuscate(dataToStore);
             }
 
             using FileStream stream = new FileStream(fullPath, FileMode.Create);
@@ -145,12 +147,12 @@ public class FileDataHandler
         return mostRecentProfileID;
     }
 
-    private string EncryptDecrypt(string dataToProcess)
+    private string Obfuscate(string dataToProcess)
     {
         string modifiedData = "";
         for(int i = 0; i < dataToProcess.Length; i++)
         {
-            modifiedData += (char)(dataToProcess[i] ^ encryptionCodeWord[i % encryptionCodeWord.Length]);
+            modifiedData += (char)(dataToProcess[i] ^ obfuscationKey[i % obfuscationKey.Length]);
         }
         return modifiedData;
     }
