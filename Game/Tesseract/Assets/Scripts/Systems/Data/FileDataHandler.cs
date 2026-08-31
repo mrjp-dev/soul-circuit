@@ -84,6 +84,12 @@ public class FileDataHandler
     {
         Dictionary<string, GameData> dataProfileDict = new Dictionary<string, GameData>();
 
+        // No directory means no saves yet, which is the normal first-run state.
+        // DataManager.Awake reaches here via GetMostRecentDataProfileID before
+        // anything has been written, so this must not throw.
+        if (!Directory.Exists(dataFileDirectoryPath))
+            return dataProfileDict;
+
         IEnumerable<DirectoryInfo> directoriesInformation = new DirectoryInfo(dataFileDirectoryPath).EnumerateDirectories();
         foreach (DirectoryInfo dirInfo in directoriesInformation)
         {
