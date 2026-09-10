@@ -19,49 +19,10 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     [SerializeField] private GameObject currentInteractable;
     [SerializeField] private CustomTag currentInteractableTag;
 
-    private struct Force
-    {
-        public string Name;
-        public ForceMode Mode;
-        public Vector3 Direction;
-        public float Magnitude;
-        public float Duration;
-        public bool IsInterruptable;
-        public bool IsSelfInterruptable;
-        public bool AllowsMovement;
-        public bool AllowsGravity;
+    private readonly ActionForceRunner forces = new ActionForceRunner();
 
-        public Force(string name = "None",
-                     ForceMode mode = ForceMode.Force,
-                     Vector3 direction = default,
-                     float magnitude = 0f,
-                     float duration = 0f,
-                     bool isInterruptable = true,
-                     bool isSelfInterruptable = true,
-                     bool allowsMovement = true,
-                     bool allowsGravity = true)
-        {
-            Name = name;
-            Mode = mode;
-            Direction = direction;
-            Magnitude = magnitude;
-            Duration = duration;
-            IsInterruptable = isInterruptable;
-            IsSelfInterruptable = isSelfInterruptable;
-            AllowsMovement = allowsMovement;
-            AllowsGravity = allowsGravity;
-        }
-    }
-    
-    private Force previousForce = new Force();
-    private Force currentForce = new Force();
-    private Force nullForce = new Force("None");
-
-    private Force jumpForce;
-    private Force attackForce;
-    private Force dodgeForce;
-    private Force dashForce;
-
+    // Inspector readouts only. Kept because they are the fastest way to
+    // watch interrupt behaviour while tuning feel in play mode.
     [SerializeField] private string previousForceName;
     [SerializeField] private string currentForceName;
 
@@ -149,16 +110,10 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     [SerializeField] private float maxVerticalSpeed = 0; // Actual observed vertical movement speed after physics
     [Space(20)]
 
-    [SerializeField] private float fixedFrameTime; // 
-    [SerializeField] private float frameTime; // 
-
-    [Header("Other Forces")]
-    [SerializeField] private float otherForceDuration; //
-    [SerializeField] private float otherForceTimer = 0f; //
+    [SerializeField] private float fixedFrameTime; //
+    [SerializeField] private float frameTime; //
 
     [Header("States")]
-    [SerializeField] private bool otherForce = false; // true
-
     [SerializeField] private bool isRunning; // True if the player is pressing the run button
     [SerializeField] private bool isPressingJump; // True if the player is pressing the jump button
     [SerializeField] private bool canJump; // True if the player is able to jump
@@ -305,10 +260,10 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void FixedUpdate()
     {
-        previousForceName = previousForce.Name;
-        currentForceName = currentForce.Name;
+        previousForceName = forces.Previous.Name;
+        currentForceName = forces.Current.Name;
 
-        CheckOtherForceTimer();
+        TickActionForce();
         CheckGround();
         CheckFall(); // Check if player's vertical speed is less than the falling speed threshold
         CoyoteTimeCheck();
@@ -334,7 +289,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         canJump = jumpDelay > jumpDelayTimer;
         isRunning = inputRun.IsPressed() && horizontalDirection.magnitude > 0;
         isJumping = inputJump.IsPressed() && !isGrounded;
-        
+
 
         //Apply movement
         BetterMovePlayer();
@@ -362,7 +317,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
     {
         Vector3 rayOrigin = transform.position; //transform.TransformPoint(colliderComponent.center);
         Vector3 rayDir = transform.TransformDirection(Vector3.down);
-        
+
 
         Debug.DrawRay(rayOrigin, rayDir * floatDistance, Color.blue); // Draw raycast color
         Debug.DrawRay(new Vector3(rayOrigin.x, rayOrigin.y - floatDistance, rayOrigin.z), rayDir * rayDistance, Color.cyan); // Draw raycast color
@@ -388,8 +343,8 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
             groundDelta = Mathf.Infinity;
             isGrounded = false;
         }
-            
-        
+
+
         animationComponent.SetGrounded(isGrounded);
     }
 
@@ -406,33 +361,15 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         animationComponent.SetFalling(isFalling, transform.eulerAngles.y);
     }
 
-    private void CheckOtherForceTimer(bool otherCondition = false)
+    private void TickActionForce()
     {
-        bool baseCondition = otherForceDuration > otherForceTimer;
-        otherForce = baseCondition || otherCondition;
-
-        if (otherForce)
-            otherForceTimer += Time.fixedDeltaTime;
-        else
-        {
-            otherForceTimer = otherForceDuration;
-            currentForce = nullForce;
-            previousForce = currentForce;
-
+        if (forces.Tick(Time.fixedDeltaTime))
             animationComponent.SetForceEndTrigger();
-        }
     }
 
     #endregion
 
     #region Player Triggers & Event Triggers
-
-    private void StartOtherForceTimer(float forceDuration)
-    {
-        otherForce = true;
-        otherForceDuration = forceDuration;
-        otherForceTimer = 0f;
-    }
 
     /* OnTriggerEnter, OnTriggerStay, and OnTriggerExit check whether the player has come in contact, or lost it with an interactable object,
      * and then toggles interactivity with said object(s)
@@ -508,11 +445,16 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
             shouldGround = false;
             onAirMoveFactor = isRunning ? 5.5f * Time.fixedDeltaTime : 1.5f * Time.fixedDeltaTime;
 
-            jumpForce = new Force("Jump", ForceMode.Impulse, Vector3.up, isRunning ? data.JumpBoost * data.JumpSpeed : data.JumpSpeed, 0f, true, false, true, true);
-            ApplyActionForce(jumpForce);
-
-            //rbComponent.AddForce(isRunning ? dataComponent.JumpBoost * dataComponent.JumpSpeed * Vector3.up : dataComponent.JumpSpeed * Vector3.up, ForceMode.Impulse);
-
+            ApplyActionForce(new ActionForce(
+                name: "Jump",
+                mode: ForceMode.Impulse,
+                direction: Vector3.up,
+                magnitude: isRunning ? data.JumpBoost * data.JumpSpeed : data.JumpSpeed,
+                duration: 0f,
+                isInterruptable: true,
+                isSelfInterruptable: false,
+                allowsMovement: true,
+                allowsGravity: true));
 
             animationComponent.SetJumpAnim();
         }
@@ -520,95 +462,50 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void TriggerPrimaryAction(InputAction.CallbackContext context)
     {
-        attackForce = new Force(name: "Attack",
-                                mode: ForceMode.Impulse,
-                                direction: transform.forward,
-                                magnitude: 5f,
-                                duration: .2f,
-                                isInterruptable: true,
-                                isSelfInterruptable: false,
-                                allowsMovement: false,
-                                allowsGravity: false);
-
-        ApplyActionForce(attackForce);
+        ApplyActionForce(new ActionForce(
+            name: "Attack",
+            mode: ForceMode.Impulse,
+            direction: transform.forward,
+            magnitude: 5f,
+            duration: .2f,
+            isInterruptable: true,
+            isSelfInterruptable: false,
+            allowsMovement: false,
+            allowsGravity: false));
 
         animationComponent.SetPrimaryAnim();
     }
 
     private void TriggerSecondaryAction(InputAction.CallbackContext context)
     {
-        // dodgeForce = new Force("Dodge", ForceMode.Impulse, transform.forward, 20f, .25f, false, false, false, true);
-        dashForce = new Force(name: "Dash",
-                              mode: ForceMode.Impulse,
-                              direction: transform.forward,
-                              magnitude: 10f,
-                              duration: .5f,
-                              isInterruptable: true,
-                              isSelfInterruptable: false,
-                              allowsMovement: false,
-                              allowsGravity: false);
-
-        ApplyActionForce(dashForce);
+        ApplyActionForce(new ActionForce(
+            name: "Dash",
+            mode: ForceMode.Impulse,
+            direction: transform.forward,
+            magnitude: 10f,
+            duration: .5f,
+            isInterruptable: true,
+            isSelfInterruptable: false,
+            allowsMovement: false,
+            allowsGravity: false));
 
         animationComponent.SetSecondaryAnim();
     }
 
-    private void ApplyActionForce(Force actionForce)
+    private void ApplyActionForce(ActionForce actionForce)
     {
-        if (otherForce)
-        {
-            if (actionForce.Name == previousForce.Name)
-            {
-                if(actionForce.IsSelfInterruptable)
-                {
-                    Debug.Log("Interrupting previous force");
+        bool wasActive = forces.IsActive;
 
-                    currentForce = actionForce;
+        if (!forces.TryApply(actionForce))
+            return;
 
+        // Interrupting a running force kills momentum so the new one starts
+        // from rest. A force applied from idle keeps existing momentum on
+        // purpose: dashing out of a run should carry the run's speed.
+        if (wasActive)
+            rbComponent.linearVelocity = Vector3.zero;
 
-                    rbComponent.linearVelocity = Vector3.zero;
-                    StartOtherForceTimer(actionForce.Duration);
-                    rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
-                }
-                else
-                {
-                    Debug.LogWarning("Can't apply force in this moment!");
-                    currentForce = nullForce;
-                    return;
-                }
-            }
-            else if (previousForce.IsInterruptable)
-            {
-                Debug.Log("Interrupting previous force");
-
-                currentForce = actionForce;
-
-                rbComponent.linearVelocity = Vector3.zero;
-                StartOtherForceTimer(actionForce.Duration);
-                rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
-
-                Debug.Log(isGrounded ? "Performed " + actionForce.Name + " on the ground" : "Performed " + actionForce.Name + " on the air");
-
-                previousForce = actionForce;
-            }
-
-            else
-            {
-                Debug.LogWarning("Can't apply force in this moment!");
-                currentForce = nullForce;
-                return;
-            }
-        }
-        else
-        {
-            currentForce = actionForce;
-
-            StartOtherForceTimer(actionForce.Duration);
-            rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
-
-            Debug.Log(isGrounded ? "Performed " + actionForce.Name + " on the ground" : "Performed " + currentForce.Name + " on the air");
-        }
-        previousForce = currentForce;
+        rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
     }
 
     /* TriggerPause pauses the game if the pause button has been pressed
@@ -646,7 +543,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         float maxAccel = maxAccelerationForce * maxAccelerationForceFactorFromDot.Evaluate(velocityDot);
         neededAccel = Vector3.ClampMagnitude(neededAccel, maxAccel);
 
-        if (currentForce.AllowsMovement)
+        if (forces.Current.AllowsMovement)
         {
             rbComponent.AddForce(Vector3.Scale(neededAccel * rbComponent.mass, horizontalForceScale));
 
@@ -654,7 +551,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
                 transform.rotation = Quaternion.LookRotation(newMoveDirection);
 
             animationComponent.SetMoveAnimation
-            (   
+            (
                 horizontalDirection.x,
                 horizontalDirection.y,
                 horizontalDirection.magnitude > 0,
@@ -671,7 +568,7 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void ApplyGravity()
     {
-        if(!isGrounded && currentForce.AllowsGravity) // Apply gravity only if the player isn't grounded and if the current force allows it
+        if(!isGrounded && forces.Current.AllowsGravity) // Apply gravity only if the player isn't grounded and if the current force allows it
         {
             if (isJumping && !isFalling)
                 rbComponent.AddForce(data.InitialPressedGravityFactor * Physics.gravity.y * Vector3.up); // First half of the jump and still pressing jump
@@ -747,6 +644,6 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void OnDrawGizmos()
     {
-        
+
     }
 }
