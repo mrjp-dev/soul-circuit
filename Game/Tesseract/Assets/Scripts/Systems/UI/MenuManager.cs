@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -67,6 +68,12 @@ public class MenuManager : MonoBehaviour
 
     public void ChangeScene(string scene)
     {
+        if (!Application.CanStreamedLevelBeLoaded(scene))
+        {
+            Debug.LogWarning($"Scene '{scene}' is not in the build yet.");
+            return;
+        }
+
         // Save while this scene's objects still exist; by sceneUnloaded they are destroyed.
         DataManager.Current.SaveGame();
         SceneManager.LoadScene(scene);
@@ -78,8 +85,15 @@ public class MenuManager : MonoBehaviour
     private void SetMenuMode(bool inMenu)
     {
         menuContainer.SetActive(inMenu);
-        if (PlayerControl.Current != null)
-            PlayerControl.Current.InputComponent.SwitchCurrentActionMap(inMenu ? "UI" : "Player");
         if (!inMenu) EventSystem.current.SetSelectedGameObject(null);
+        StartCoroutine(SwitchActionMap(inMenu ? "UI" : "Player"));
+    }
+
+    // A frame late on purpose: closing the last menu happens inside the UI/Cancel callback,
+    // and disabling the UI map there made the input module throw reading that same action.
+    private static IEnumerator SwitchActionMap(string map)
+    {
+        yield return null;
+        if (PlayerControl.Current != null) PlayerControl.Current.InputComponent.SwitchCurrentActionMap(map);
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Ink.Runtime;
 using TMPro;
 using UnityEngine;
@@ -170,10 +171,10 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
         textDialogue.maxVisibleCharacters = 0;
         if (!skipRequested) EventSystem.current.SetSelectedGameObject(forceLineButton);
 
-        // maxVisibleCharacters counts visible characters only, so rich-text tags cost no
-        // delay; the original skipped them by hand. One cached wait instead of one per letter.
-        textDialogue.ForceMeshUpdate();
-        int total = textDialogue.textInfo.characterCount;
+        // Counted from the string, not from TMP's mesh: the box uses Truncate overflow and only
+        // grows after this line is laid out, so the mesh held about 15 characters and the rest
+        // was never revealed. Tags are stripped because maxVisibleCharacters skips them.
+        int total = Regex.Replace(line, "<[^>]*>", "").Length;
         WaitForSeconds delay = new WaitForSeconds(textDelay);
         while (textDialogue.maxVisibleCharacters < total && !skipRequested)
         {

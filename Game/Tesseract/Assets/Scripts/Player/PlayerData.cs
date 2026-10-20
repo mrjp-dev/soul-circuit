@@ -58,17 +58,28 @@ public class PlayerData : ScriptableObject
 
     public void RestoreStats() => Health = maxHealth;
 
-    // Saves carry health only. Tuning stays in this asset, otherwise loading an old save
-    // in the editor would overwrite the asset's tuned values.
+    // Stats travel with the save so upgrades persist. In the editor this writes into the asset
+    // itself (ScriptableObjects keep play-mode changes), so loading a save also changes tuning.
+    // The original loaded runBoost but never saved it; all five now go both ways.
     public void SaveData(GameData data)
     {
         data.maxHealth = maxHealth;
         data.health = health;
+        data.walkSpeed = walkSpeed;
+        data.runBoost = runBoost;
+        data.jumpSpeed = jumpSpeed;
+        data.jumpBoost = jumpBoost;
+        data.initialPressedGravityFactor = initialPressedGravityFactor;
     }
 
     public void LoadData(GameData data)
     {
         maxHealth = data.maxHealth;
         health = data.health;
+        walkSpeed = data.walkSpeed;
+        runBoost = data.runBoost;
+        jumpSpeed = data.jumpSpeed;
+        jumpBoost = data.jumpBoost;
+        initialPressedGravityFactor = data.initialPressedGravityFactor;
     }
 }
