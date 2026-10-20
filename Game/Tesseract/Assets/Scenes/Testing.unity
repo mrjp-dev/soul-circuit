@@ -5855,7 +5855,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ffef25957008e44c9a2accb4d2ff175, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _camera: {fileID: 1170106860}
+  display: {fileID: 1236969281}
+  resolution: {x: 640, y: 360}
+  snapTargets:
+  - {fileID: 1911476691}
+  shadowColor: {r: 0.08, g: 0.06, b: 0.2, a: 0.55}
 --- !u!1 &1177849546
 GameObject:
   m_ObjectHideFlags: 0
