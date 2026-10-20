@@ -1,28 +1,12 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+// A save point. Saving itself happens through the point's Ink dialogue (#save tag), so this
+// only makes it interactable and keeps it spinning.
 public class SavePointControl : NonPlayableObject
 {
-    [SerializeField] private float rotationSpeed = 60f; // speed at which the game object rotates
+    [SerializeField] private float rotationSpeed = 60f; // degrees per second
 
-    protected override void Awake()
-    {
-        base.Awake();
+    private void Start() => objectData.IsInteractable = true;
 
-        gameObj = transform.gameObject;
-        CustomTagComp = GetComponent<CustomTag>();
-        RendererComp = GetComponent<Renderer>();
-        ColliderComp = GetComponent<BoxCollider>();
-    }
-
-    private void Start()
-    {
-        objectData.IsInteractable = true;
-    }
-
-    private void FixedUpdate()
-    {
-        transform.Rotate(rotationSpeed * Time.fixedDeltaTime * Vector3.down); // Make game object rotate constantly at a fixed speed
-    }
+    private void FixedUpdate() => transform.Rotate(rotationSpeed * Time.fixedDeltaTime * Vector3.down);
 }

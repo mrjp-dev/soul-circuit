@@ -1,29 +1,15 @@
 using UnityEngine;
 
-public class NonPlayable : MonoBehaviour
+// Anything in the world the player can approach but does not control. Each subclass exposes
+// its own data asset through Data; this class only holds what every kind shares.
+public abstract class NonPlayable : MonoBehaviour
 {
-    [SerializeField] protected NPData baseData;
+    public abstract NPData Data { get; }
 
-    protected GameObject gameObj; // non-playable's game object
-    protected CustomTag customTagComp; // non-playable's custom tags
-    protected Renderer rendererComp;
-    protected Collider colliderComp;
-
-    public NPData BaseData { get => baseData; set => baseData = value; }
-    public Renderer RendererComp { get => rendererComp; set => rendererComp = value; }
-    public Collider ColliderComp { get => colliderComp; set => colliderComp = value; }
-    public GameObject GameObj { get => gameObj; set => gameObj = value; }
-    public CustomTag CustomTagComp { get => customTagComp; set => customTagComp = value; }
-
+    // PlayerInteraction checks Unity's built-in tag, so it must follow the data. Unused so far.
     public void ToggleInteractable(bool state)
     {
-        BaseData.IsInteractable = state;
-        gameObj.tag = BaseData.IsInteractable ? "Interactable" : "Untagged";
-
-    }
-
-    protected virtual void Awake()
-    {
-
+        Data.IsInteractable = state;
+        gameObject.tag = state ? "Interactable" : "Untagged";
     }
 }

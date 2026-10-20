@@ -1,40 +1,24 @@
-using System;
-using UnityEngine;
 using Unity.Cinemachine;
-using System.Collections.Generic;
-using Unity.VisualScripting;
+using UnityEngine;
 
+// Steps the player camera through fixed zoom levels. The sizes are hand-picked, not computed:
+// at 640x360, an orthographic size of 11.24 is pixel-perfect at zoom 1, and each other level
+// is that divided by its zoom factor (1, 2, 4, 5, 8, 10, 20, 40).
 public class PlayerCameraController : MonoBehaviour
 {
+    private static readonly float[] OrthographicSizes = { 11.24f, 5.62f, 2.81f, 2.248f, 1.405f, 1.124f, 0.562f, 0.281f };
+    private static readonly float[] PerspectiveDistances = { 20f, 10f, 5f, 4f, 2.5f, 2f, 1f, 0.5f };
+
     private CinemachineCamera cmCamera;
-    private CinemachineThirdPersonFollow cm3PFollowerComponent;
-    private CinemachineHardLookAt cmHardLookAt;
-    
-    /*
-        11.24, 11.25, and 11.26 work as perfect orthographic size for 640x360px at zoom level 1
-    */
-    private readonly int[] zoomLevels = new[]{1, 2, 4, 5, 8, 10, 20, 40};
-    private readonly float[] zoomLevelsOrtho = new[]{11.24f, 5.62f, 2.81f, 2.248f, 1.405f, 1.124f, 0.562f, 0.281f};
-    private readonly float[] zoomLevelsPersp = new[]{20f, 10f, 5f, 4f, 2.5f, 2f, 1f, 0.5f};
-    private float orthoSize;
-    private int zoomLevelIndex = 0;
+    private CinemachineThirdPersonFollow follow;
+    private CinemachineHardLookAt lookAt;
+    private int zoomLevel;
 
-    public float OrthoSize
+    private void Awake()
     {
-        get => orthoSize;
-        set
-        {
-            orthoSize = Mathf.Clamp(value, 2.2f, 11f);
-        }
-    }
-    public int ZoomLevelIndex
-    {
-        get => zoomLevelIndex;
-        set
-        {
-            zoomLevelIndex = Mathf.Clamp(value, 0, 7);
-        }
-
+        cmCamera = GetComponent<CinemachineCamera>();
+        follow = GetComponent<CinemachineThirdPersonFollow>();
+        lookAt = GetComponent<CinemachineHardLookAt>();
     }
 
     private void OnEnable()
@@ -49,44 +33,18 @@ public class PlayerCameraController : MonoBehaviour
         EventManager.Current.OnCameraZoomOut -= ZoomOut;
     }
 
-    private void Awake()
-    {
-        cmCamera = GetComponent<CinemachineCamera>();
-        cm3PFollowerComponent = GetComponent<CinemachineThirdPersonFollow>();
-        cmHardLookAt = GetComponent<CinemachineHardLookAt>();
-        
-        orthoSize = 11f;
-    }
+    private void ZoomIn() => Zoom(1);
 
-    private void ZoomIn()
-    {
-        ZoomLevelIndex++;
-        if (cmCamera.Lens.Orthographic)
-            cmCamera.Lens.OrthographicSize = zoomLevelsOrtho[ZoomLevelIndex]; // Hardcoded zoom orthographic size according to zoom level
-            //cmCamera.Lens.OrthographicSize /= zoomLevels[ZoomLevelIndex];   // Calculated zoom orthographic size according to zoom level
-        else
-            cm3PFollowerComponent.CameraDistance = zoomLevelsPersp[ZoomLevelIndex];
-            //cmCamera.Lens.OrthographicSize /= zoomLevelsPersp[zoomLevelIndex];
-        CheckForOddResolution(ZoomLevelIndex);
-    }
-    private void ZoomOut()
-    {
-        ZoomLevelIndex--;
-        if (cmCamera.Lens.Orthographic)
-            cmCamera.Lens.OrthographicSize = zoomLevelsOrtho[ZoomLevelIndex]; // Hardcoded zoom orthographic size according to zoom level
-            //cmCamera.Lens.OrthographicSize *= zoomLevels[ZoomLevelIndex];   // Calculated zoom orthographic size according to zoom level
-        else
-            cm3PFollowerComponent.CameraDistance = zoomLevelsPersp[ZoomLevelIndex];
-            //cmCamera.Lens.OrthographicSize *= zoomLevelsPersp[zoomLevelIndex];
-        CheckForOddResolution(ZoomLevelIndex);
-    }
+    private void ZoomOut() => Zoom(-1);
 
-    private void CheckForOddResolution(int index)
+    private void Zoom(int step)
     {
-        cmHardLookAt.LookAtOffset.y = index switch
-        {
-            4 or 7 => 0.03125f,
-            _ => 0,
-        };
+        zoomLevel = Mathf.Clamp(zoomLevel + step, 0, OrthographicSizes.Length - 1);
+        if (cmCamera.Lens.Orthographic) cmCamera.Lens.OrthographicSize = OrthographicSizes[zoomLevel];
+        else follow.CameraDistance = PerspectiveDistances[zoomLevel];
+
+        // At 8x and 40x the view is an odd number of pixels tall (360/8 = 45, 360/40 = 9), so
+        // its centre falls mid-pixel; a 1/32 unit nudge on the look-at target realigns it.
+        lookAt.LookAtOffset.y = zoomLevel is 4 or 7 ? 0.03125f : 0f;
     }
 }

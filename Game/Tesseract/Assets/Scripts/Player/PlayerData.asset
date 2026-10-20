@@ -15,11 +15,7 @@ MonoBehaviour:
   health: 12
   maxHealth: 12
   walkSpeed: 7
-  runSpeed: 10.5
   runBoost: 1.5
   jumpSpeed: 14
   jumpBoost: 1.3
   initialPressedGravityFactor: 2
-  initialReleasedGravityFactor: 11
-  latterPressedGravityFactor: 5
-  latterReleasedGravityFactor: 7

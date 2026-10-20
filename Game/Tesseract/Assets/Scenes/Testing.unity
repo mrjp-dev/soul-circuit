@@ -2450,6 +2450,9 @@ GameObject:
   - component: {fileID: 475390418}
   - component: {fileID: 475390424}
   - component: {fileID: 475390425}
+  - component: {fileID: 475390428}
+  - component: {fileID: 475390427}
+  - component: {fileID: 475390426}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -2623,31 +2626,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   data: {fileID: 11400000, guid: 365fcf7fd17d813469c58ee2f21809d6, type: 2}
-  rbComponent: {fileID: 0}
-  rbColliderComponent: {fileID: 0}
-  boxColliders: []
-  interactCollider: {fileID: 0}
-  hurtboxCollider: {fileID: 0}
-  hitboxCollider: {fileID: 0}
-  currentInteractable: {fileID: 0}
-  currentInteractableTag: {fileID: 0}
-  previousForceName: 
-  currentForceName: 
   floatDistance: 0.625
   rayDistance: 1.5
-  interactLayer:
-    serializedVersion: 2
-    m_Bits: 0
+  springStrength: 2000
+  dampForce: 40
+  groundDeltaThreshold: 0.0625
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
-  damageLayer:
-    serializedVersion: 2
-    m_Bits: 0
-  maxMoveSpeed: 0
   acceleration: 100
-  onAirMaxMoveSpeed: 0
-  onAirMoveFactor: 0
   accelerationFactorFromDot:
     serializedVersion: 2
     m_Curve:
@@ -2696,36 +2683,22 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  horizontalDirection: {x: 0, y: 0}
-  maxHorizontalVelocity: {x: 0, y: 0, z: 0}
-  jumpDelay: 0
-  jumpDelayTimer: 0
-  springStrength: 2000
-  dampForce: 40
-  groundDeltaThreshold: 0.0625
-  groundDelta: 0
-  lastPosition: {x: 0, y: 0, z: 0}
-  desiredHorizontalVelocity: {x: 0, y: 0, z: 0}
-  desiredHorizontalSpeed: 0
-  horizontalVelocity: {x: 0, y: 0, z: 0}
-  horizontalSpeed: 0
-  highestPoint: 0
-  verticalSpeed: 0
-  minVerticalSpeed: 0
-  maxVerticalSpeed: 0
-  fixedFrameTime: 0
-  frameTime: 0
-  otherForceDuration: 0
-  otherForceTimer: 0
-  otherForce: 0
-  isRunning: 0
-  isPressingJump: 0
-  canJump: 0
-  shouldGround: 1
-  isJumping: 0
-  isFalling: 0
-  isGrounded: 0
-  couldInteract: 0
+  attack:
+    Name: Attack
+    Mode: 1
+    Direction: {x: 0, y: 0, z: 1}
+    Magnitude: 5
+    Duration: 0.2
+    LocksMovement: 1
+    LocksGravity: 1
+  dash:
+    Name: Dash
+    Mode: 1
+    Direction: {x: 0, y: 0, z: 1}
+    Magnitude: 10
+    Duration: 0.5
+    LocksMovement: 1
+    LocksGravity: 1
 --- !u!136 &475390422
 CapsuleCollider:
   m_ObjectHideFlags: 0
@@ -2806,6 +2779,48 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &475390426
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475390415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 61002989d842d9f4eb0237a9806586e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::PlayerMetrics
+  currentForce: 
+  horizontalSpeed: 0
+  verticalSpeed: 0
+  minVerticalSpeed: 0
+  maxVerticalSpeed: 0
+  highestPoint: 0
+--- !u!114 &475390427
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475390415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e485eba9e27713e4e946fc8a30af78e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::PlayerInteraction
+--- !u!114 &475390428
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 475390415}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6d3b0fcbf193d6489470452cbb28177, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::SystemInput
 --- !u!1 &486330967
 GameObject:
   m_ObjectHideFlags: 0
@@ -3050,6 +3065,16 @@ PrefabInstance:
       propertyPath: textDialogue
       value: 
       objectReference: {fileID: 486330971}
+    - target: {fileID: 4198216709317100590, guid: 12b76e12065aeb241bb96915119f8cb4,
+        type: 3}
+      propertyPath: progressButton
+      value: 
+      objectReference: {fileID: 549766595}
+    - target: {fileID: 4198216709317100590, guid: 12b76e12065aeb241bb96915119f8cb4,
+        type: 3}
+      propertyPath: forceLineButton
+      value: 
+      objectReference: {fileID: 2063765557}
     - target: {fileID: 4198216709317100590, guid: 12b76e12065aeb241bb96915119f8cb4,
         type: 3}
       propertyPath: portraitAnimator
@@ -3598,7 +3623,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7ae5871fe73f6524b898317c034906f3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  healthBar: {fileID: 623131028}
   healthUnit: {fileID: 8083884845753765456, guid: 03eeeeef9ecc3744bb386110dfdde487,
     type: 3}
   pData: {fileID: 11400000, guid: 365fcf7fd17d813469c58ee2f21809d6, type: 2}
@@ -4571,6 +4595,7 @@ GameObject:
   - component: {fileID: 807558399}
   - component: {fileID: 807558398}
   - component: {fileID: 807558397}
+  - component: {fileID: 807558401}
   m_Layer: 5
   m_Name: Menu_ConfirmExitGame
   m_TagString: Untagged
@@ -4677,6 +4702,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 807558395}
   m_CullTransparentMesh: 1
+--- !u!114 &807558401
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 807558395}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 526114b7ece250349acd9ab4d806ea6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::MenuPanel
+  defaultFocus: {fileID: 165241969}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -4739,6 +4777,7 @@ GameObject:
   - component: {fileID: 989417335}
   - component: {fileID: 989417334}
   - component: {fileID: 989417333}
+  - component: {fileID: 989417337}
   m_Layer: 5
   m_Name: Menu_ConfirmReturnToStart
   m_TagString: Untagged
@@ -4845,6 +4884,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 989417331}
   m_CullTransparentMesh: 1
+--- !u!114 &989417337
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 989417331}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 526114b7ece250349acd9ab4d806ea6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::MenuPanel
+  defaultFocus: {fileID: 722790837}
 --- !u!43 &991987364
 Mesh:
   m_ObjectHideFlags: 0
@@ -5435,7 +5487,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0252fce77796b24cb37026a4cbdef2c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boxColliderToDrawOn: {fileID: 0}
   colorTransparency: 1
   draw: 1
   drawStates: 1
@@ -5737,7 +5788,7 @@ Camera:
   serializedVersion: 2
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
-  m_projectionMatrixMode: 0
+  m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
   m_Iso: 200
@@ -6873,6 +6924,7 @@ GameObject:
   - component: {fileID: 1282550085}
   - component: {fileID: 1282550084}
   - component: {fileID: 1282550083}
+  - component: {fileID: 1282550086}
   m_Layer: 5
   m_Name: Menu_Options
   m_TagString: Untagged
@@ -6964,6 +7016,19 @@ MonoBehaviour:
   m_ChildScaleWidth: 0
   m_ChildScaleHeight: 0
   m_ReverseArrangement: 0
+--- !u!114 &1282550086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1282550081}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 526114b7ece250349acd9ab4d806ea6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::MenuPanel
+  defaultFocus: {fileID: 1660010615}
 --- !u!1 &1355565653
 GameObject:
   m_ObjectHideFlags: 0
@@ -7686,7 +7751,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0252fce77796b24cb37026a4cbdef2c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boxColliderToDrawOn: {fileID: 0}
   colorTransparency: 0.5
   draw: 1
   drawStates: 0
@@ -8490,7 +8554,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c0252fce77796b24cb37026a4cbdef2c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  boxColliderToDrawOn: {fileID: 0}
   colorTransparency: 0.5
   draw: 1
   drawStates: 0
@@ -9346,6 +9409,7 @@ GameObject:
   - component: {fileID: 1847003433}
   - component: {fileID: 1847003435}
   - component: {fileID: 1847003434}
+  - component: {fileID: 1847003436}
   m_Layer: 5
   m_Name: Menu_Dialogue
   m_TagString: Untagged
@@ -9412,6 +9476,19 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1847003432}
   m_CullTransparentMesh: 1
+--- !u!114 &1847003436
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1847003432}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 526114b7ece250349acd9ab4d806ea6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: SoulCircuit.Game::MenuPanel
+  defaultFocus: {fileID: 2063765557}
 --- !u!1 &1911476690
 GameObject:
   m_ObjectHideFlags: 0
@@ -9917,9 +9994,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   selectCube: {fileID: 1650032178}
-  currentSelection: {fileID: 0}
-  offset: {x: -328, y: -180, z: -4}
-  isWritingDialogue: 0
 --- !u!114 &1953475700
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10912,7 +10986,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &2063765558
 RectTransform:
   m_ObjectHideFlags: 0
@@ -11457,7 +11531,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 74b8c1e19df07ae419a0e40fa555781a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseData: {fileID: 0}
   characterData: {fileID: 11400000, guid: d96a5cfcdf2bef74fbe19481feae3df1, type: 2}
 --- !u!114 &4809599006687305215 stripped
 MonoBehaviour:

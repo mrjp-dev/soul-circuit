@@ -1,649 +1,242 @@
 using System;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+// Moves the player character: a capsule floated above the ground by a damped spring,
+// steered by acceleration curves, with jump, attack and dash applied as action forces.
+// Interaction, system input and tuning readouts live in sibling components.
 public class PlayerControl : MonoBehaviour, IDataPersistence
 {
     public static PlayerControl Current { get; private set; }
+
+    // A jump still counts this long after walking off a ledge. It was a serialized field that
+    // Awake overwrote, so the scenes hold 0 for it and must not be read.
+    private const float CoyoteTime = 0.25f;
+    private const float MaxAccelerationForce = 500f; // scaled per turn by the curve below
+    private const float FallingSpeed = -0.5f; // below this, spring jitter is not mistaken for a fall
+
     [SerializeField] private PlayerData data;
-    private PlayerInput inputComponent;
-    private PlayerAnimation animationComponent;
-    [SerializeField] private Rigidbody rbComponent;
-    [SerializeField] private CapsuleCollider rbColliderComponent;
-    [SerializeField] private BoxCollider[] boxColliders;
-    [SerializeField] private BoxCollider interactCollider;
-    [SerializeField] private BoxCollider hurtboxCollider;
-    [SerializeField] private BoxCollider hitboxCollider;
 
-    [SerializeField] private GameObject currentInteractable;
-    [SerializeField] private CustomTag currentInteractableTag;
-
-    private readonly ActionForceRunner forces = new ActionForceRunner();
-
-    // Inspector readouts only. Kept because they are the fastest way to
-    // watch interrupt behaviour while tuning feel in play mode.
-    [SerializeField] private string previousForceName;
-    [SerializeField] private string currentForceName;
-
-    // Floating
-
+    [Header("Floating")]
     [SerializeField] private float floatDistance;
     [SerializeField] private float rayDistance;
-
-    // Scratch space for the ground raycast. RaycastHit is not [Serializable], so a public
-    // field here was never actually serialized by Unity despite looking like it was.
-    private RaycastHit hitInfo;
-    public LayerMask interactLayer;
-    public LayerMask groundLayer;
-    public LayerMask damageLayer;
-
-    // Player character inputs
-    private InputAction inputMove;
-    private InputAction inputAct1;
-    private InputAction inputAct2;
-    private InputAction inputAct3;
-    private InputAction inputAct4;
-    private InputAction inputJump;
-    private InputAction inputInteraction;
-    private InputAction inputRun;
-    private InputAction inputMenuOptions;
-    private InputAction inputInventory;
-    private InputAction inputMap;
-    private InputAction inputCameraZoomIn;
-    private InputAction inputCameraZoomOut;
-
-    // Menu inputs
-    private InputAction inputMenuCancel;
-
-    // Owns pause/inventory/zoom/cancel routing. Not serialized: built in Awake.
-    private SystemInputRouter systemInput;
-
-    #region Movement Variables
-
-    [Header("Horizontal Movement Factors")]
-    [SerializeField] private float maxMoveSpeed; // maximum movement speed defined by input
-    [SerializeField] private float acceleration; // defines how fast maxMoveSpeed will be reached
-
-    // Move speed while falling, and its decreasing factor
-    [SerializeField] private float onAirMaxMoveSpeed;
-    [SerializeField] private float onAirMoveFactor;
-
-    private float maxAccelerationForce = 500f; // maximum force that can be applied when accelerating
-
-    [Header("Factor Curves")]
-    [SerializeField] private AnimationCurve accelerationFactorFromDot; // how fast the acceleration will change when switching directions
-    [SerializeField] private AnimationCurve maxAccelerationForceFactorFromDot; // how fast the maximum force will change when switching directions
-
-    private Vector3 goalHorizontalVelocity = Vector3.zero; // desired horizontal velocity
-    private Vector3 horizontalForceScale = new Vector3(1f, 0, 1f); // scaling vector used in AddForce() for scaling the force to be applied
-
-    [Header("Horizontal Movement Attributes")]
-    [SerializeField] private Vector2 horizontalDirection; // Player's direction of movement as dictated by inputMove
-    [SerializeField] private Vector3 maxHorizontalVelocity; // Player's force of movement after transforming the 2D vector of movement direction and applying the corresponding forces
-
-    [Header("Vertical Movement Attributes")]
-    [SerializeField] private float jumpDelay; //
-    [SerializeField] private float jumpDelayTimer; //
-
     [SerializeField] private float springStrength = 2000f;
     [SerializeField] private float dampForce = 40f;
+    [SerializeField] private float groundDeltaThreshold;
+    [SerializeField] private LayerMask groundLayer;
 
-    [SerializeField] private float groundDeltaThreshold; // The delta threshold for the player to be considered grounded
-    [SerializeField] private float groundDelta = 0; // The delta between the floating distance and the distance at which the raycast hit the ground collider
+    [Header("Horizontal Movement")]
+    [SerializeField] private float acceleration;
+    [SerializeField] private AnimationCurve accelerationFactorFromDot;
+    [SerializeField] private AnimationCurve maxAccelerationForceFactorFromDot;
 
-    [Header("Metrics")]
-    [SerializeField] private Vector3 lastPosition; // Player's position in the last frame
-    [Space(20)]
+    // Attack and dash are data so they can be tuned here. Jump is built in code because its
+    // strength comes from PlayerData, next to the rest of the movement tuning.
+    [Header("Action Forces")]
+    [SerializeField] private ActionForce attack = new ActionForce
+    {
+        Name = "Attack", Mode = ForceMode.Impulse, Direction = Vector3.forward,
+        Magnitude = 5f, Duration = 0.2f, LocksMovement = true, LocksGravity = true,
+    };
+    [SerializeField] private ActionForce dash = new ActionForce
+    {
+        Name = "Dash", Mode = ForceMode.Impulse, Direction = Vector3.forward,
+        Magnitude = 10f, Duration = 0.5f, LocksMovement = true, LocksGravity = true,
+    };
 
-    [SerializeField] private Vector3 desiredHorizontalVelocity; // Desired horizontal velocity speed as per input
-    [SerializeField] private float desiredHorizontalSpeed; // Desired horizontal speed as per input
-    [Space(20)]
+    private readonly ActionForceRunner forces = new ActionForceRunner();
+    private Rigidbody body;
+    private PlayerAnimation anim;
+    private InputAction move, jump, run;
+    private InputBindings bindings;
 
-    [SerializeField] private Vector3 horizontalVelocity; // observed horizontal velocity after physics
-    [SerializeField] private float horizontalSpeed; // observed horizontal speed after physics
-    [Space(20)]
+    // Runtime state. Not serialized; the Inspector's Debug mode still shows it while tuning.
+    private Vector2 input;
+    private Vector3 goalVelocity;
+    private float airSpeed, airSpeedDecay, coyoteTimer;
+    private bool shouldGround = true;
+    private bool isGrounded, isFalling, isJumping, isRunning;
 
-    [SerializeField] private float highestPoint; // highest position reached in y axis
-    [SerializeField] private float verticalSpeed; // observed vertical movement speed after physics
-    [SerializeField] private float minVerticalSpeed = 0; // Actual observed vertical movement speed after physics
-    [SerializeField] private float maxVerticalSpeed = 0; // Actual observed vertical movement speed after physics
-    [Space(20)]
-
-    [SerializeField] private float fixedFrameTime; //
-    [SerializeField] private float frameTime; //
-
-    [Header("States")]
-    [SerializeField] private bool isRunning; // True if the player is pressing the run button
-    [SerializeField] private bool isPressingJump; // True if the player is pressing the jump button
-    [SerializeField] private bool canJump; // True if the player is able to jump
-    [SerializeField] private bool shouldGround = true; // True if the player isn't jumping
-    [SerializeField] private bool isJumping; // True if the player is pressing the jump button and is not grounded
-    [SerializeField] private bool isFalling; // True if verticalSpeed < 0
-    [SerializeField] private bool isGrounded; // True if the player's grounding checkbox is in contact with an object with ground LayerMask
-    [SerializeField] private bool couldInteract; // True if the player's trigger collider is in contact with an object with the "Interactable" tag
-
-    #endregion
-
-    public PlayerInput InputComponent { get => inputComponent; private set => inputComponent = value; }
-
-    #region Initialization
+    public PlayerInput InputComponent { get; private set; }
+    public string CurrentForceName => forces.Current.Name;
 
     private void Awake()
     {
-        // Singleton instance
-        if (Current == null)
-            Current = this;
+        if (Current == null) Current = this;
 
-        // Get PlayerInput component and map the corresponding InputActions
-        inputComponent = GetComponent<PlayerInput>();
+        body = GetComponent<Rigidbody>();
+        anim = GetComponentInChildren<PlayerAnimation>();
+        InputComponent = GetComponent<PlayerInput>();
 
-        // Player character control inputs
-        inputMove = inputComponent.actions["Move"];
-        inputAct1 = inputComponent.actions["Act1"];
-        inputAct2 = inputComponent.actions["Act2"];
-        inputAct3 = inputComponent.actions["Act3"];
-        inputAct4 = inputComponent.actions["Act4"];
-        inputJump = inputComponent.actions["Jump"];
-        inputInteraction = inputComponent.actions["Interact"];
-        inputRun = inputComponent.actions["Run"];
-        inputMenuOptions = inputComponent.actions["MenuOptions"];
-        inputInventory = inputComponent.actions["MenuInventory"];
-        inputMap = inputComponent.actions["MenuMap"];
-        inputCameraZoomIn = inputComponent.actions["ZoomIn"];
-        inputCameraZoomOut = inputComponent.actions["ZoomOut"];
-
-        // Menu control inputs
-        inputMenuCancel = inputComponent.actions["Cancel"];
-
-        animationComponent = GetComponentInChildren<PlayerAnimation>();
-
-        rbComponent = GetComponent<Rigidbody>();
-
-        // Get collider components
-        rbColliderComponent = transform.GetComponent<CapsuleCollider>();
-
-        boxColliders = transform.GetComponentsInChildren<BoxCollider>();
-
-        // Resolved by name rather than by index. GetComponentsInChildren order follows the
-        // hierarchy, so indexing meant reordering the player's children silently rebound
-        // this to a different collider, and an empty array threw out of Awake.
-        interactCollider = FindCollider("Collider_Interact");
-
-        // Combat is not built yet. Collider_Hurtbox and Collider_Hitbox exist in the
-        // scene but stay unbound on purpose; wire them here when combat lands.
-
-        systemInput = new SystemInputRouter(
-            inputMenuOptions,
-            inputInventory,
-            inputCameraZoomIn,
-            inputCameraZoomOut,
-            inputMenuCancel,
-            new EventManagerInputSink());
-
-        jumpDelay = 0.25f;
-        jumpDelayTimer = 0f;
-
-        Physics.IgnoreCollision(interactCollider, rbColliderComponent, true);
-
-        data.InitializeDataIfNull();
-    }
-
-    private BoxCollider FindCollider(string colliderName)
-    {
-        foreach (BoxCollider c in boxColliders)
-            if (c.gameObject.name == colliderName) return c;
-
-        Debug.LogError($"PlayerControl: no child BoxCollider named '{colliderName}'.", this);
-        return null;
+        InputActionAsset actions = InputComponent.actions;
+        move = actions["Move"];
+        jump = actions["Jump"];
+        run = actions["Run"];
+        bindings = new InputBindings(actions,
+            ("Jump", _ => TriggerJump()),
+            ("Act1", _ => ApplyActionForce(attack, anim.SetPrimaryAnim)),
+            ("Act2", _ => ApplyActionForce(dash, anim.SetSecondaryAnim)));
     }
 
     private void OnEnable()
     {
         EventManager.Current.OnPlayerDeath += TriggerDeath;
         EventManager.Current.OnPlayerRestore += data.RestoreStats;
-
-        // Input subscriptions belong here rather than in Start so they pair with
-        // OnDisable. InputActions live on the PlayerInput asset, not on this
-        // GameObject, so handlers left attached survive the player's destruction and
-        // stack up on the next scene load, firing once per stale subscription.
-        inputJump.performed += TriggerJump;
-        inputAct1.performed += TriggerPrimaryAction;
-        inputAct2.performed += TriggerSecondaryAction;
-        inputInteraction.performed += TriggerInteraction;
-
-        systemInput.Enable();
+        bindings.Enable();
     }
 
     private void OnDisable()
     {
         EventManager.Current.OnPlayerDeath -= TriggerDeath;
         EventManager.Current.OnPlayerRestore -= data.RestoreStats;
-
-        inputJump.performed -= TriggerJump;
-        inputAct1.performed -= TriggerPrimaryAction;
-        inputAct2.performed -= TriggerSecondaryAction;
-        inputInteraction.performed -= TriggerInteraction;
-
-        systemInput.Disable();
+        bindings.Disable();
     }
 
+    // Otherwise Current keeps pointing at a destroyed player between scene loads.
     private void OnDestroy()
     {
-        // Otherwise Current keeps pointing at a destroyed player between scene loads.
         if (Current == this) Current = null;
     }
 
-    public void TriggerDeath()
-    {
-        Debug.Log("Player Died!");
-    }
-
-    #endregion
-
-    #region Updates
-
-    private void Update()
-    {
-        // Get continuous player input
-        horizontalDirection = inputMove.ReadValue<Vector2>();
-        isPressingJump = inputJump.IsPressed();
-
-#if UNITY_EDITOR
-        // Editor-only cheats on P/O/I/V. Excluded from builds so players cannot
-        // trigger them and so the per-frame Keyboard polling costs nothing shipped.
-        HandleDebugKeys();
-#endif
-
-        frameTime = Time.deltaTime;
-    }
+    private void TriggerDeath() => Debug.LogWarning("Player died. Death is not implemented yet.");
 
     private void FixedUpdate()
     {
-        previousForceName = forces.Previous.Name;
-        currentForceName = forces.Current.Name;
+        input = move.ReadValue<Vector2>();
+        if (forces.Tick(Time.fixedDeltaTime)) anim.SetForceEndTrigger();
 
-        TickActionForce();
         CheckGround();
-        CheckFall(); // Check if player's vertical speed is less than the falling speed threshold
-        CoyoteTimeCheck();
+        CheckFall();
 
-        //shouldGround = (canJump && isGrounded);
+        // Ordering matters: coyote time reads last step's isJumping, as it always has.
+        coyoteTimer = isGrounded ? 0f : isJumping ? CoyoteTime : coyoteTimer + Time.fixedDeltaTime;
+        isRunning = run.IsPressed() && input != Vector2.zero;
+        isJumping = jump.IsPressed() && !isGrounded;
 
-        minVerticalSpeed = Mathf.Min(minVerticalSpeed, rbComponent.linearVelocity.y);
-        maxVerticalSpeed = Mathf.Max(maxVerticalSpeed, rbComponent.linearVelocity.y);
-
-        desiredHorizontalVelocity = maxHorizontalVelocity;
-        desiredHorizontalSpeed = maxHorizontalVelocity.magnitude;
-
-        // Calculate player's horizontal speed
-        Vector3 positionXZ = transform.position - new Vector3(0f, transform.position.y, 0f);
-        horizontalVelocity = (positionXZ - lastPosition) / Time.fixedDeltaTime;
-        horizontalSpeed = horizontalVelocity.magnitude;
-        lastPosition = positionXZ;
-
-        // Calculate player's highest vertical position
-        highestPoint = Mathf.Max(highestPoint, transform.position.y);
-
-        // Continuously check if the player is running and jumping
-        canJump = jumpDelay > jumpDelayTimer;
-        isRunning = inputRun.IsPressed() && horizontalDirection.magnitude > 0;
-        isJumping = inputJump.IsPressed() && !isGrounded;
-
-
-        //Apply movement
-        BetterMovePlayer();
-
-        fixedFrameTime = Time.fixedDeltaTime;
-    }
-
-    #endregion
-
-    #region Player State Checks
-
-    /* GroundCheck() creates a physics checkBox with checkBoxSize, and the checkBox returns if it's colliding with
-     * an object with the ground LayerMask, currently the only layer considered ground is "Environment"
-     */
-
-    private void CoyoteTimeCheck()
-    {
-        if (!isGrounded)
-            jumpDelayTimer = isJumping ? jumpDelay : jumpDelayTimer + Time.fixedDeltaTime;
-        else
-            jumpDelayTimer = 0f;
+        Move();
+        ApplyGravity();
     }
 
     private void CheckGround()
     {
-        Vector3 rayOrigin = transform.position; //transform.TransformPoint(colliderComponent.center);
-        Vector3 rayDir = transform.TransformDirection(Vector3.down);
+        Vector3 down = -transform.up;
+        bool hit = Physics.Raycast(transform.position, down, out RaycastHit ground, rayDistance, groundLayer);
+        float groundDelta = hit ? ground.distance - floatDistance : float.PositiveInfinity;
 
+        // Damped spring toward floatDistance. Released on take-off so it cannot fight the jump.
+        if (hit && shouldGround)
+            body.AddForce(down * (groundDelta * springStrength - Vector3.Dot(down, body.linearVelocity) * dampForce));
 
-        Debug.DrawRay(rayOrigin, rayDir * floatDistance, Color.blue); // Draw raycast color
-        Debug.DrawRay(new Vector3(rayOrigin.x, rayOrigin.y - floatDistance, rayOrigin.z), rayDir * rayDistance, Color.cyan); // Draw raycast color
-
-        bool rayHit = Physics.Raycast(rayOrigin, rayDir, out hitInfo, rayDistance, groundLayer);
-
-        if (rayHit)
-        {
-            Vector3 rbVelocity = rbComponent.linearVelocity;
-            float rayDirVelocity = Vector3.Dot(rayDir, rbVelocity);
-
-            groundDelta = hitInfo.distance - floatDistance;
-
-            float springForce = (groundDelta * springStrength) - (rayDirVelocity * dampForce);
-
-            if(shouldGround)
-                rbComponent.AddForce(rayDir * springForce);
-
-            isGrounded = Mathf.Abs(groundDelta) < groundDeltaThreshold;
-        }
-        else
-        {
-            groundDelta = Mathf.Infinity;
-            isGrounded = false;
-        }
-
-
-        animationComponent.SetGrounded(isGrounded);
+        isGrounded = Mathf.Abs(groundDelta) < groundDeltaThreshold;
+        anim.SetGrounded(isGrounded);
+        Debug.DrawRay(transform.position, down * rayDistance, isGrounded ? Color.green : Color.cyan);
     }
-
-    // FallingCheck() takes in the rigidbody velocity in its Y axis, and returns if its value is less than 0, or negative
 
     private void CheckFall()
     {
-        verticalSpeed = rbComponent.linearVelocity.y;
-        isFalling = rbComponent.linearVelocity.y < -0.5f;
-
-        if (isFalling)
-            shouldGround = true;
-
-        animationComponent.SetFalling(isFalling, transform.eulerAngles.y);
+        isFalling = body.linearVelocity.y < FallingSpeed;
+        if (isFalling) shouldGround = true;
+        anim.SetFalling(isFalling);
     }
 
-    private void TickActionForce()
+    private void Move()
     {
-        if (forces.Tick(Time.fixedDeltaTime))
-            animationComponent.SetForceEndTrigger();
+        Vector3 direction = new Vector3(input.x, 0f, input.y);
+        float dot = Vector3.Dot(direction, goalVelocity);
+        float groundSpeed = isRunning ? data.RunSpeed : data.WalkSpeed;
+
+        // In the air, speed starts at take-off speed and decays each step, so jumps commit.
+        float speed = isGrounded ? groundSpeed : airSpeed;
+        airSpeed = isGrounded ? groundSpeed : Mathf.Max(airSpeed - airSpeedDecay, 0f);
+
+        goalVelocity = Vector3.MoveTowards(goalVelocity, speed * direction,
+            acceleration * accelerationFactorFromDot.Evaluate(dot) * Time.fixedDeltaTime);
+
+        bool canMove = !forces.Current.LocksMovement;
+        if (canMove) Steer(direction, dot);
+
+        Vector2 shown = canMove ? input : Vector2.zero;
+        anim.SetMoveAnimation(shown.x, shown.y, shown != Vector2.zero, canMove && isRunning);
+        anim.SetDirection(transform.eulerAngles.y);
     }
 
-    #endregion
-
-    #region Player Triggers & Event Triggers
-
-    /* OnTriggerEnter, OnTriggerStay, and OnTriggerExit check whether the player has come in contact, or lost it with an interactable object,
-     * and then toggles interactivity with said object(s)
-     */
-
-    public void OnTriggerEnter(Collider other)
+    // Steering is a force, never a velocity write, so the float spring and action forces
+    // still add on top of it within the same physics step.
+    private void Steer(Vector3 direction, float dot)
     {
-        if (other.gameObject.CompareTag("Interactable"))
-            ToggleInteract(true, other.gameObject);
-        else
-            ToggleInteract(false);
-    }
+        Vector3 velocity = body.linearVelocity;
+        Vector3 needed = (goalVelocity - new Vector3(velocity.x, 0f, velocity.z)) / Time.fixedDeltaTime;
+        needed = Vector3.ClampMagnitude(needed, MaxAccelerationForce * maxAccelerationForceFactorFromDot.Evaluate(dot));
+        body.AddForce(needed.x * body.mass, 0f, needed.z * body.mass);
 
-    public void OnTriggerStay(Collider other)
-    {
-        if (other.gameObject.CompareTag("Interactable"))
-            ToggleInteract(true, other.gameObject);
-        else
-            ToggleInteract(false);
-    }
-
-    public void OnTriggerExit(Collider other)
-    {
-        if (other.gameObject.CompareTag("Interactable"))
-            ToggleInteract(false);
-    }
-
-    /* ToggleInteract toggles interactivity between the player and interactable objects, as it reads the player's ability to interact
-     * and sets the currentInteractable object to the latest interactable the player has collided with
-     */
-
-    public void ToggleInteract(bool state, GameObject interactableObject = null)
-    {
-        couldInteract = state;
-        currentInteractable = interactableObject;
-
-        if (couldInteract)
-        {
-            currentInteractableTag = currentInteractable.GetComponent<CustomTag>();
-            //Debug.Log("Can Interact!");
-        }
-        else
-        {
-            currentInteractableTag = null;
-            //Debug.Log("Can No Longer Interact!");
-        }
-    }
-
-    /* TriggerInteraction triggers an interaction between the player and the currentInteractable
-     * if the player can interact and the object is interactable and has an interactable tag
-     */
-
-    private void TriggerInteraction(InputAction.CallbackContext context)
-    {
-        if (context.performed && couldInteract)
-        {
-            //switch(currentInteractableTag.);
-            if (currentInteractableTag.HasTag("Item"))
-                Debug.Log("Interacted with item!");// Do stuff
-            else
-                DialogueManager.Current.StartDialogue(currentInteractable);
-        }
-    }
-
-    /* TriggerJump makes the player jump if the jump button has been pressed and the player is grounded, using AddForce and making the
-     * player jump a bit higher if they're running
-     */
-
-    private void TriggerJump(InputAction.CallbackContext context)
-    {
-        if (context.performed && (isGrounded || canJump))
-        {
-            shouldGround = false;
-            onAirMoveFactor = isRunning ? 5.5f * Time.fixedDeltaTime : 1.5f * Time.fixedDeltaTime;
-
-            ApplyActionForce(new ActionForce(
-                name: "Jump",
-                mode: ForceMode.Impulse,
-                direction: Vector3.up,
-                magnitude: isRunning ? data.JumpBoost * data.JumpSpeed : data.JumpSpeed,
-                duration: 0f,
-                isInterruptable: true,
-                isSelfInterruptable: false,
-                allowsMovement: true,
-                allowsGravity: true));
-
-            animationComponent.SetJumpAnim();
-        }
-    }
-
-    private void TriggerPrimaryAction(InputAction.CallbackContext context)
-    {
-        ApplyActionForce(new ActionForce(
-            name: "Attack",
-            mode: ForceMode.Impulse,
-            direction: transform.forward,
-            magnitude: 5f,
-            duration: .2f,
-            isInterruptable: true,
-            isSelfInterruptable: false,
-            allowsMovement: false,
-            allowsGravity: false));
-
-        animationComponent.SetPrimaryAnim();
-    }
-
-    private void TriggerSecondaryAction(InputAction.CallbackContext context)
-    {
-        ApplyActionForce(new ActionForce(
-            name: "Dash",
-            mode: ForceMode.Impulse,
-            direction: transform.forward,
-            magnitude: 10f,
-            duration: .5f,
-            isInterruptable: true,
-            isSelfInterruptable: false,
-            allowsMovement: false,
-            allowsGravity: false));
-
-        animationComponent.SetSecondaryAnim();
-    }
-
-    private void ApplyActionForce(ActionForce actionForce)
-    {
-        bool wasActive = forces.IsActive;
-
-        if (!forces.TryApply(actionForce))
-            return;
-
-        // Interrupting a running force kills momentum so the new one starts
-        // from rest. A force applied from idle keeps existing momentum on
-        // purpose: dashing out of a run should carry the run's speed.
-        if (wasActive)
-            rbComponent.linearVelocity = Vector3.zero;
-
-        rbComponent.AddForce(actionForce.Direction * actionForce.Magnitude, actionForce.Mode);
-    }
-
-    /* TriggerPause pauses the game if the pause button has been pressed
-     */
-
-    // Pause, inventory, camera zoom, and menu cancel are handled by SystemInputRouter.
-    // They are bound to the player's PlayerInput component but are not player actions.
-
-    #endregion
-
-    #region Player Movement
-    private void BetterMovePlayer()
-    {
-        Vector3 newMoveDirection = new Vector3(horizontalDirection.x, 0f, horizontalDirection.y);
-
-        float velocityDot = Vector3.Dot(newMoveDirection, goalHorizontalVelocity);
-        float accel = acceleration * accelerationFactorFromDot.Evaluate(velocityDot);
-
-        maxMoveSpeed = isRunning ? data.RunSpeed : data.WalkSpeed;
-
-        if (isGrounded)
-        {
-            maxHorizontalVelocity = maxMoveSpeed * newMoveDirection;
-            onAirMaxMoveSpeed = maxMoveSpeed;
-        }
-        else
-        {
-            maxHorizontalVelocity = onAirMaxMoveSpeed * newMoveDirection;
-            onAirMaxMoveSpeed = Mathf.Max(onAirMaxMoveSpeed - onAirMoveFactor, 0);
-        }
-
-        goalHorizontalVelocity = Vector3.MoveTowards(goalHorizontalVelocity, maxHorizontalVelocity, accel * Time.fixedDeltaTime);
-
-        Vector3 neededAccel = (goalHorizontalVelocity - new Vector3(rbComponent.linearVelocity.x, 0f, rbComponent.linearVelocity.z)) / Time.fixedDeltaTime;
-        float maxAccel = maxAccelerationForce * maxAccelerationForceFactorFromDot.Evaluate(velocityDot);
-        neededAccel = Vector3.ClampMagnitude(neededAccel, maxAccel);
-
-        if (forces.Current.AllowsMovement)
-        {
-            rbComponent.AddForce(Vector3.Scale(neededAccel * rbComponent.mass, horizontalForceScale));
-
-            if (horizontalDirection.magnitude > 0)
-                transform.rotation = Quaternion.LookRotation(newMoveDirection);
-
-            animationComponent.SetMoveAnimation
-            (
-                horizontalDirection.x,
-                horizontalDirection.y,
-                horizontalDirection.magnitude > 0,
-                isRunning
-            );
-        }
-        else
-            animationComponent.SetMoveAnimation(0f, 0f, false, false);
-
-        animationComponent.SetDirection(transform.eulerAngles.y);
-
-        ApplyGravity();
+        if (direction != Vector3.zero) transform.rotation = Quaternion.LookRotation(direction);
     }
 
     private void ApplyGravity()
     {
-        if(!isGrounded && forces.Current.AllowsGravity) // Apply gravity only if the player isn't grounded and if the current force allows it
-        {
-            if (isJumping && !isFalling)
-                rbComponent.AddForce(data.InitialPressedGravityFactor * Physics.gravity.y * Vector3.up); // First half of the jump and still pressing jump
+        if (isGrounded || forces.Current.LocksGravity) return;
 
-            else if (!isJumping && !isFalling)
-                rbComponent.AddForce(data.InitialReleasedGravityFactor * Physics.gravity.y * Vector3.up); // First half of the jump and stopped pressing jump
-
-            else if (isJumping && isFalling)
-                rbComponent.AddForce(data.LatterPressedGravityFactor * Physics.gravity.y * Vector3.up); // Second half of the jump and still pressing jump
-
-            else if (!isJumping && isFalling)
-                rbComponent.AddForce(data.LatterReleasedGravityFactor * Physics.gravity.y * Vector3.up); // Second half of the jump and stopped pressing jump
-        }
+        // Four phases: rising or falling, jump held or released.
+        float factor = isFalling
+            ? (isJumping ? data.LatterPressedGravityFactor : data.LatterReleasedGravityFactor)
+            : (isJumping ? data.InitialPressedGravityFactor : data.InitialReleasedGravityFactor);
+        body.AddForce(factor * Physics.gravity.y * Vector3.up);
     }
-    #endregion
 
-    #region Testing
+    private void TriggerJump()
+    {
+        if (!isGrounded && coyoteTimer >= CoyoteTime) return;
+
+        shouldGround = false;
+        // Air speed lost per step: running jumps start faster but bleed speed quicker.
+        airSpeedDecay = (isRunning ? 5.5f : 1.5f) * Time.fixedDeltaTime;
+        ApplyActionForce(new ActionForce
+        {
+            Name = "Jump",
+            Mode = ForceMode.Impulse,
+            Direction = Vector3.up,
+            Magnitude = data.JumpSpeed * (isRunning ? data.JumpBoost : 1f),
+        }, anim.SetJumpAnim);
+    }
+
+    private void ApplyActionForce(ActionForce force, Action animate)
+    {
+        bool interrupting = forces.IsActive;
+        if (!forces.TryApply(force)) return;
+
+        // Interrupting a running force kills momentum so the new one starts from rest; a force
+        // applied from idle keeps it on purpose, so dashing out of a run carries the run.
+        if (interrupting) body.linearVelocity = Vector3.zero;
+
+        body.AddForce(transform.TransformDirection(force.Direction) * force.Magnitude, force.Mode);
+        animate();
+    }
+
 #if UNITY_EDITOR
-
-    private void HandleDebugKeys()
+    // Editor-only cheats, excluded from builds so players cannot trigger them.
+    // V recovers the Player action map if a menu ever leaves input stuck on UI.
+    private void Update()
     {
-        if (Keyboard.current == null) return;
+        Keyboard keys = Keyboard.current;
+        if (keys == null) return;
 
-        if (Keyboard.current.pKey.wasPressedThisFrame)
-            ApplyDamage();
-        if (Keyboard.current.oKey.wasPressedThisFrame)
-            IncreaseMaxHealth();
-        if (Keyboard.current.iKey.wasPressedThisFrame)
-            IncreaseCurrentHealth();
-        if (Keyboard.current.vKey.wasPressedThisFrame)
-        {
-            inputComponent.SwitchCurrentActionMap("Player");
-            Debug.Log("input changed");
-        }
+        if (keys.pKey.wasPressedThisFrame) data.Health--;
+        if (keys.oKey.wasPressedThisFrame) data.MaxHealth += 4;
+        if (keys.iKey.wasPressedThisFrame) data.Health++;
+        if (keys.vKey.wasPressedThisFrame) InputComponent.SwitchCurrentActionMap("Player");
     }
-
-    private void ApplyDamage()
-    {
-        data.Health--;
-    }
-
-    private void IncreaseMaxHealth()
-    {
-        data.MaxHealth += 4;
-    }
-    private void IncreaseCurrentHealth()
-    {
-        data.Health++;
-    }
-
 #endif
-    #endregion
 
-    #region Saving & Loading
-
-    public void SaveData(GameData data)
+    public void SaveData(GameData saved)
     {
-        this.data.SaveData(data);
-
-        data.position = transform.position;
-        data.rotation = transform.rotation;
+        data.SaveData(saved);
+        saved.position = transform.position;
+        saved.rotation = transform.rotation;
     }
 
-    public void LoadData(GameData data)
+    public void LoadData(GameData saved)
     {
-        this.data.LoadData(data);
-
-        transform.position = data.position;
-        transform.rotation = data.rotation;
-    }
-
-    #endregion
-
-    private void OnDrawGizmos()
-    {
-
+        data.LoadData(saved);
+        transform.SetPositionAndRotation(saved.position, saved.rotation);
     }
 }

@@ -1,413 +1,206 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
-using System;
 using Ink.Runtime;
+using TMPro;
+using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
+// Runs Ink conversations: writes each line letter by letter, offers its choices, and applies
+// its #tags. Global Ink variables outlive conversations and are stored in saves.
 public class DialogueManager : MonoBehaviour, IDataPersistence
 {
     public static DialogueManager Current { get; private set; }
 
     [SerializeField] private GameObject[] choices;
     [SerializeField] private GameObject progressButton;
-    public GameObject ProgressButton { get => progressButton;}
-
     [SerializeField] private GameObject forceLineButton;
-    public GameObject ForceLineButton { get => forceLineButton;}
-
-    [Header("Load Global Variables JSON")]
     [SerializeField] private TextAsset loadGlobalVariablesJSON;
-
     [SerializeField] private TextMeshProUGUI textDialogueSource;
     [SerializeField] private TextMeshProUGUI textDialogue;
-    [SerializeField] private TextMeshProUGUI[] textChoices;
-
     [SerializeField] private Animator portraitAnimator;
+    [SerializeField] private float textDelay; // seconds per character
 
-    [SerializeField] private NonPlayable currentNonPlayable;
+    // The dialogue box grows with its text up to these limits, then wraps.
+    [SerializeField] private LayoutElement layoutTextDialogue;
+    [SerializeField] private RectTransform rTransformTextDialogue;
+    [SerializeField] private float maxWidthTextDialogue = 600;
+    [SerializeField] private float maxHeightTextDialogue = 40;
 
-    private const string sourceTag = "source";
-    private const string voiceTag = "voice";
-    private const string portraitTag = "portrait";
-    private const string layoutTag = "layout";
-    private const string saveTag = "save";
-    private const string restoreTag = "restore";
+    private TextMeshProUGUI[] choiceTexts;
+    private Dictionary<string, Action<string>> tagHandlers;
+    private DialogueVariables globals;
+    private Story story;
+    private NonPlayable speaker;
+    private bool isWriting;
+    private bool skipRequested;
 
-    private const string sourceKnown = "known";
-    private const string sourceUnknown = "unknown";
-    
-    public LayoutElement layoutTextDialogue;
-    public RectTransform rTransformTextDialogue;
+    public GameObject ProgressButton => progressButton;
+    public GameObject ForceLineButton => forceLineButton;
 
-    public float maxWidthTextDialogue = 600;
-    public float maxHeightTextDialogue = 40;
-
-    [SerializeField] private bool canDisplayNextLine = true;
-    [SerializeField] private bool forceFinishLine = false;
-
-    private Story currentDialogue;
-    private DialogueVariables globalDialogueVariables;
-
-    [SerializeField] private float textDelay;
-
-    public float TextDelay { get => textDelay; set => textDelay = value; }
-    
-
+    // True when a line starts writing, false when it is fully shown.
     public event Action<bool> OnWritingLine;
-
-    public event Action OnPassedMaxWidth;
-    public event Action OnPassedMaxHeight;
-
-    public void PassedMaxWidth()
-    {
-        OnPassedMaxWidth?.Invoke();
-    }
-
-    public void PassedMaxHeight()
-    {
-        OnPassedMaxHeight?.Invoke();
-    }
-
-    public void WritingLine(bool state)
-    {
-        OnWritingLine?.Invoke(state);
-    }
 
     private void Awake()
     {
-        if (Current == null)
-            Current = this;
-        else
-            Debug.LogError("Another instance of Dialogue Manager already exists");
+        if (Current == null) Current = this;
+        else Debug.LogError("A second DialogueManager exists; only the first one is used.");
 
-        if (MenuManager.Current != null)
+        choiceTexts = Array.ConvertAll(choices, choice => choice.GetComponentInChildren<TextMeshProUGUI>());
+
+        // Defaults until a save is loaded. The old code only set these when persistence was
+        // disabled, so a first run with no save hit a null reference on the first conversation.
+        globals = new DialogueVariables(loadGlobalVariablesJSON.text, null);
+
+        // One row per Ink tag: supporting a new #tag is one more line here. Unknown tags are ignored.
+        tagHandlers = new Dictionary<string, Action<string>>
         {
-            progressButton = MenuManager.Current.progressButton;
-            forceLineButton = MenuManager.Current.forceLineButton;
-        }
-        else
-            Debug.LogError("Menu Manager not found");
-    }
-
-    public void OnEnable()
-    {
-        if (Current != null)
-        {
-            OnWritingLine += DisplayChoices;
-            OnWritingLine += SetProgressButtonActive;
-            OnWritingLine += SetProgressButtonVisibility;
-
-            EventManager.Current.OnNoDataPersistence += LoadDataDefaults;
-        }
-        else
-            Debug.LogError("Dialogue Manager not found");
-        
-    }
-    public void OnDisable()
-    {
-        OnWritingLine -= DisplayChoices;
-        OnWritingLine -= SetProgressButtonActive;
-        OnWritingLine += SetProgressButtonVisibility;
-
-        EventManager.Current.OnNoDataPersistence -= LoadDataDefaults;
-    }
-
-    private void Start()
-    {
-        //globalDialogueVariables = new DialogueVariables(loadGlobalVariablesJSON, null);
-
-        textChoices = new TextMeshProUGUI[choices.Length];
-        int index = 0;
-        foreach(GameObject choice in choices)
-        {
-            textChoices[index] = choice.GetComponentInChildren<TextMeshProUGUI>();
-            index++;
-        }
+            ["source"] = value => textDialogueSource.text = value switch
+            {
+                "known" => speaker.Data.NpName,
+                "unknown" => "???",
+                _ => value,
+            },
+            ["portrait"] = value => portraitAnimator.Play(value),
+            ["save"] = _ => DataManager.Current.SaveGame(),
+            ["restore"] = _ => EventManager.Current.PlayerRestored(),
+        };
     }
 
     public void StartDialogue(GameObject interactable)
     {
-        if(interactable.GetComponent<CustomTag>().HasTag("NPC"))
+        speaker = interactable.GetComponent<NonPlayable>();
+        if (speaker.Data.Dialogue == null)
         {
-            float lookAtAngle = (PlayerControl.Current.gameObject.transform.eulerAngles.y + 180);
-            interactable.GetComponentInChildren<NPAnimation>().SetDirection(lookAtAngle);
-        }
-
-        currentNonPlayable = interactable.GetComponent<NonPlayable>();
-
-        if (currentNonPlayable.BaseData.Dialogue.DialogueJSON != null)
-            currentDialogue = new Story(currentNonPlayable.BaseData.Dialogue.DialogueJSON.text);
-        else
-        {
-            Debug.LogWarning("Non-playable has no dialogue text asset attached");
+            Debug.LogWarning($"{interactable.name} has no dialogue asset.");
             return;
         }
 
-        EventManager.Current.OpenMenu(4);
-        globalDialogueVariables.StartListening(currentDialogue);
+        // NPCs turn to face the player; other speakers, like save points, stay put.
+        if (interactable.GetComponent<CustomTag>().HasTag("NPC"))
+            interactable.GetComponentInChildren<NPAnimation>().SetDirection(PlayerControl.Current.transform.eulerAngles.y + 180f);
 
-        textDialogueSource.text = "";
-        textDialogue.text = ""; 
-        portraitAnimator.Play("default"); 
+        story = new Story(speaker.Data.Dialogue.text);
+        EventManager.Current.OpenMenu((int)MenuId.Dialogue);
+        globals.StartListening(story);
 
-        DisplayDialogueSource(currentNonPlayable.BaseData.NpName);
+        textDialogue.text = "";
+        textDialogueSource.text = speaker.Data.NpName;
+        portraitAnimator.Play("default");
         DisplayNextLine();
     }
 
-    public void EndDialogue()
+    // Wired to the progress button.
+    public void DisplayNextLine()
+    {
+        // Preserved: asking for a line mid-write ends the conversation. The progress button is
+        // hidden while writing, so players should not reach it.
+        if (!story.canContinue || isWriting)
+        {
+            EndDialogue();
+            return;
+        }
+
+        layoutTextDialogue.preferredWidth = -1;
+        layoutTextDialogue.preferredHeight = -1;
+        string line = story.Continue();
+
+        if (string.IsNullOrEmpty(line))
+        {
+            EndDialogue();
+            return;
+        }
+
+        StartCoroutine(WriteLine(line));
+        ApplyTags(story.currentTags);
+        FitTextDialogue();
+    }
+
+    // Wired to the choice buttons.
+    public void MakeChoice(int index)
+    {
+        if (isWriting) return;
+
+        story.ChooseChoiceIndex(index);
+        DisplayNextLine();
+    }
+
+    // Wired to the finish-line button: shows the rest of the line at once.
+    public void ForceFinishLine() => skipRequested = true;
+
+    private void EndDialogue()
     {
         EventManager.Current.Back();
         textDialogue.text = "";
-        globalDialogueVariables.StopListening(currentDialogue);
-        currentDialogue = null;
+        globals.StopListening(story);
+        story = null;
     }
 
-    public void DisplayDialogueSource(string sourceName)
+    private void ApplyTags(List<string> tags)
     {
-        textDialogueSource.text = sourceName;
-    }
-
-    public void DisplayNextLine()
-    {
-        if (currentDialogue.canContinue && canDisplayNextLine)
+        foreach (string tag in tags)
         {
-            layoutTextDialogue.preferredWidth = -1;
-            layoutTextDialogue.preferredHeight = -1;
-
-            string nextLine = currentDialogue.Continue();
-
-            StopAllCoroutines();
-
-            if (string.IsNullOrEmpty(nextLine))
-                EndDialogue();
-            else
-            {
-                StartCoroutine(WriteLine(nextLine, textDelay)); // Write the corresponding line
-
-                HandleTags(currentDialogue.currentTags);
-
-                SetTextDialogueWidth();
-                SetTextDialogueHeight();
-            }
-        }
-        else if (currentDialogue.canContinue == false && canDisplayNextLine)
-            EndDialogue();
-        else
-            EndDialogue();
-    }
-
-    private void HandleTags(List<string> tagsList)
-    {
-        foreach(string tag in tagsList)
-        {
-            string tagKey;
-            string tagValue;
-
-            if (tag.Contains(":"))
-            {
-                string[] splitTag = tag.Split(':');
-
-                if (splitTag.Length != 2)
-                    Debug.LogError("Tag not parsed appropiately!");
-
-                tagKey = splitTag[0].Trim();
-                tagValue = splitTag[1].Trim();
-            }
-            else
-            {
-                tagKey = tag;
-                tagValue = null;
-            }
-
-            switch(tagKey)
-            {
-                case sourceTag:
-                    textDialogueSource.text = tagValue switch
-                    {
-                        sourceKnown => currentNonPlayable.BaseData.NpName,// display the non-playable's name as the source if it's known, and as '???' otherwise
-                        sourceUnknown => "???",
-                        _ => tagValue,
-                    };
-                    break;
-
-                case portraitTag:
-                    portraitAnimator.Play(tagValue);
-                    break;
-
-                case voiceTag:
-                    // set the sound to play
-                    break;
-
-                case layoutTag:
-                    break;
-
-                case saveTag:
-                    DataManager.Current.SaveGame();
-                    break;
-                
-                case restoreTag:
-                    EventManager.Current.PlayerRestored();
-                    break;
-
-                default:
-                    break;
-            }
+            int colon = tag.IndexOf(':');
+            string key = colon < 0 ? tag : tag.Substring(0, colon).Trim();
+            string value = colon < 0 ? null : tag.Substring(colon + 1).Trim();
+            if (tagHandlers.TryGetValue(key, out Action<string> apply)) apply(value);
         }
     }
 
-    public void DisplayChoices(bool state)
+    private IEnumerator WriteLine(string line)
     {
-        if(state == false)
-        {
-            List<Choice> currentChoices = currentDialogue.currentChoices;
-
-            int index = 0;
-            foreach (Choice choice in currentChoices)
-            {
-                choices[index].SetActive(true);
-                textChoices[index].text = choice.text;
-                index++;
-            }
-
-            for (int i = index; i < choices.Length; i++)
-            {
-                choices[i].SetActive(false);
-            }
-
-            if (currentChoices.Count != 0)
-                EventSystem.current.SetSelectedGameObject(choices[0]);
-            else
-                EventSystem.current.SetSelectedGameObject(progressButton);
-        }
-        
-        else
-        {
-            for (int i = 0; i < choices.Length; i++)
-            {
-                choices[i].SetActive(false);
-            }
-            EventSystem.current.SetSelectedGameObject(progressButton);
-        }
-    }
-
-    public void MakeChoice(int choiceIndex)
-    {
-        if(canDisplayNextLine)
-        {
-            currentDialogue.ChooseChoiceIndex(choiceIndex);
-            DisplayNextLine();
-        }
-    }
-
-    public void SetProgressButtonActive(bool state)
-    {
-        if (currentDialogue.currentChoices.Count != 0)
-            progressButton.SetActive(false);
-        else
-            if(MenuManager.Current.MenuList[4].activeSelf)
-                progressButton.SetActive(true);
-            else
-                progressButton.SetActive(false);
-    }
-
-    IEnumerator WriteLine(string line, float delay)
-    {
-        canDisplayNextLine = false;
-        WritingLine(true);
-        bool isAddingRichText = false;
+        SetWriting(true);
         textDialogue.text = line;
         textDialogue.maxVisibleCharacters = 0;
+        if (!skipRequested) EventSystem.current.SetSelectedGameObject(forceLineButton);
 
-        if(forceFinishLine == false)
-            EventSystem.current.SetSelectedGameObject(forceLineButton);
-
-        foreach (char character in line.ToCharArray())
+        // maxVisibleCharacters counts visible characters only, so rich-text tags cost no
+        // delay; the original skipped them by hand. One cached wait instead of one per letter.
+        textDialogue.ForceMeshUpdate();
+        int total = textDialogue.textInfo.characterCount;
+        WaitForSeconds delay = new WaitForSeconds(textDelay);
+        while (textDialogue.maxVisibleCharacters < total && !skipRequested)
         {
-            if(forceFinishLine)
-            {
-                textDialogue.maxVisibleCharacters = line.Length;
-                ResetFinishLine();
-                break;
-            }
-
-            if (character == '<' || isAddingRichText)
-            {
-                isAddingRichText = true;
-                if (character == '>')
-                    isAddingRichText = false;
-            }
-            else
-            {
-                textDialogue.maxVisibleCharacters++;
-                // play sound
-                yield return new WaitForSeconds(delay);
-            }
-
+            textDialogue.maxVisibleCharacters++;
+            yield return delay;
         }
-        WritingLine(false);
-        canDisplayNextLine = true;
+
+        textDialogue.maxVisibleCharacters = total;
+        skipRequested = false;
+        SetWriting(false);
     }
 
-    public void ForceFinishLine()
+    private void SetWriting(bool writing)
     {
-        //Debug.Log("Forcing Line to finish");
-        forceFinishLine = true;
-    }
-    public void ResetFinishLine()
-    {
-        forceFinishLine = false;
-        EventSystem.current.SetSelectedGameObject(progressButton);
+        isWriting = writing;
+        ShowChoices(writing ? new List<Choice>() : story.currentChoices);
+        progressButton.SetActive(story.currentChoices.Count == 0 && MenuManager.Current.IsOpen(MenuId.Dialogue));
+        progressButton.transform.localScale = writing ? Vector3.zero : Vector3.one;
+        OnWritingLine?.Invoke(writing);
     }
 
-    private void SetTextDialogueWidth()
+    private void ShowChoices(List<Choice> available)
     {
-        if (rTransformTextDialogue.rect.width >= maxWidthTextDialogue)
-            layoutTextDialogue.preferredWidth = maxWidthTextDialogue;
-        else
-            layoutTextDialogue.preferredWidth = -1;
+        for (int i = 0; i < choices.Length; i++)
+        {
+            bool shown = i < available.Count;
+            choices[i].SetActive(shown);
+            if (shown) choiceTexts[i].text = available[i].text;
+        }
+
+        EventSystem.current.SetSelectedGameObject(available.Count > 0 ? choices[0] : progressButton);
     }
 
-    private void SetTextDialogueHeight()
+    // -1 hands sizing back to the layout group until the text reaches a limit.
+    private void FitTextDialogue()
     {
-        if (rTransformTextDialogue.rect.height >= maxHeightTextDialogue)
-            layoutTextDialogue.preferredHeight = maxHeightTextDialogue;
-        else
-            layoutTextDialogue.preferredHeight = -1;
+        Rect rect = rTransformTextDialogue.rect;
+        layoutTextDialogue.preferredWidth = rect.width >= maxWidthTextDialogue ? maxWidthTextDialogue : -1;
+        layoutTextDialogue.preferredHeight = rect.height >= maxHeightTextDialogue ? maxHeightTextDialogue : -1;
     }
 
-    public Ink.Runtime.Object GetVariableState(string variableName)
-    {
-        Ink.Runtime.Object variableValue;
-        globalDialogueVariables.variables.TryGetValue(variableName, out variableValue);
-        if (variableValue != null)
-            Debug.LogWarning("Ink variable not found or its value is null");
-        return variableValue;
-    }
+    public void SaveData(GameData data) => data.inkVariables = globals.SaveVariables();
 
-    private void SetProgressButtonVisibility(bool state)
-    {
-        progressButton.transform.localScale = state ? Vector3.zero : progressButton.transform.localScale = Vector3.one;
-    }
-
-    public void SaveData(GameData data)
-    {
-        data.inkVariables = globalDialogueVariables.SaveVariables();
-    }
-
-    public void LoadData(GameData data)
-    {
-        /*Debug.Log(data.inkVariables);
-        if (data.inkVariables != null)
-            globalDialogueVariables.LoadVariables(data.inkVariables);*/
-        globalDialogueVariables = new DialogueVariables(loadGlobalVariablesJSON, data.inkVariables);
-    }
-
-    public void LoadDataDefaults()
-    {
-        //Debug.Log("Loading default global variables");
-        globalDialogueVariables = new DialogueVariables(loadGlobalVariablesJSON, null);
-    }
+    public void LoadData(GameData data) => globals = new DialogueVariables(loadGlobalVariablesJSON.text, data.inkVariables);
 }

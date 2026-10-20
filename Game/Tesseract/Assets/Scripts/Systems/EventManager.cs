@@ -1,121 +1,53 @@
 using System;
 using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.UI;
 
+// Scene-wide events, so systems react to each other without holding references. Raise
+// methods exist because C# only lets the declaring class invoke an event, and because scene
+// buttons can call methods but not raise events. Runs early (execution order -500) so
+// every default-order component can subscribe in OnEnable.
 public class EventManager : MonoBehaviour
 {
     public static EventManager Current { get; private set; }
 
-    public event Action<bool> OnInteractable;
+    public event Action<int> OnOpenMenu;
+    public event Action OnBack;
 
-    public event Action OnNoDataPersistence;
-    public event Action OnNoSaveData;
-    public event Action OnNoLoadData;
     public event Action OnGameLoaded;
-    public event Action OnGameSaved;
+    public event Action OnNoLoadData;
 
-    public event Action OnPlayerDamage;
+    public event Action OnPlayerDamage; // combat scaffolding: nothing raises it yet
     public event Action OnPlayerDrawHealth;
     public event Action OnPlayerRestore;
     public event Action OnPlayerDeath;
-
-    public event Action OnPause;
-    public event Action<int> OnOpenMenu;
-    public event Action OnBack;
 
     public event Action OnCameraZoomIn;
     public event Action OnCameraZoomOut;
 
     private void Awake()
     {
-        if (Current == null)
-            Current = this;
-        else
-            Debug.LogError("Event Manager already exists");
+        if (Current == null) Current = this;
+        else Debug.LogError("A second EventManager exists; only the first one is used.");
     }
 
-    #region Menu Events
-    public void Pause()
-    {
-        OnPause?.Invoke();
-        OnOpenMenu?.Invoke(0);
-    }
+    public void Pause() => OpenMenu((int)MenuId.Options);
 
-    public void OpenMenu(int menuId)
-    {
-        OnOpenMenu?.Invoke(menuId);
-    }
+    public void OpenMenu(int menuId) => OnOpenMenu?.Invoke(menuId);
 
-    public void Back()
-    {
-        OnBack?.Invoke();
-    }
-    #endregion
+    public void Back() => OnBack?.Invoke();
 
-    #region Player Status Events
+    public void GameLoaded() => OnGameLoaded?.Invoke();
 
-    public void GameSaved()
-    {
-        OnGameSaved?.Invoke();
-    }
-    public void GameLoaded()
-    {
-        OnGameLoaded?.Invoke();
-    }
+    public void NoLoadData() => OnNoLoadData?.Invoke();
 
-    public void NoDataPersistence()
-    {
-        OnNoDataPersistence?.Invoke();
-    }
-    public void NoSaveData()
-    {
-        OnNoSaveData?.Invoke();
-    }
-    public void NoLoadData()
-    {
-        OnNoLoadData?.Invoke();
-    }
+    public void PlayerDamaged() => OnPlayerDamage?.Invoke();
 
-    public void PlayerDamaged()
-    {
-        OnPlayerDamage?.Invoke();
-    }
+    public void PlayerDeath() => OnPlayerDeath?.Invoke();
 
-    public void PlayerDeath()
-    {
-        OnPlayerDeath?.Invoke();
-    }
-    
-    public void PlayerRestored()
-    {
-        OnPlayerRestore?.Invoke();
-    }
-    
-    public void PlayerDrawHealth()
-    {
-        OnPlayerDrawHealth?.Invoke();
-    }
+    public void PlayerRestored() => OnPlayerRestore?.Invoke();
 
-    public void Interactable(bool state)
-    {
-        OnInteractable?.Invoke(state);
-    }
+    public void PlayerDrawHealth() => OnPlayerDrawHealth?.Invoke();
 
-    #endregion
+    public void CameraZoomIn() => OnCameraZoomIn?.Invoke();
 
-    #region Camera Events
-
-    public void CameraZoomIn()
-    {
-        OnCameraZoomIn?.Invoke();
-    }
-
-    public void CameraZoomOut()
-    {
-        OnCameraZoomOut?.Invoke();
-    }
-
-    #endregion
+    public void CameraZoomOut() => OnCameraZoomOut?.Invoke();
 }

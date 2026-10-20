@@ -12,8 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 93d0ba45d3e5e3d4d9ddef326749760a, type: 3}
   m_Name: SavePoint 1
   m_EditorClassIdentifier: 
-  gameObj: {fileID: 2117814691718710117, guid: 1c8950353d23e2a4e8daa7fbf78427ea, type: 3}
   npName: Save Point 1
-  dialogue:
-    dialogueJSON: {fileID: 4900000, guid: 2dc34f5e2c2a39541b0875f07dbff7ff, type: 3}
+  dialogue: {fileID: 4900000, guid: 2dc34f5e2c2a39541b0875f07dbff7ff, type: 3}
   isInteractable: 1

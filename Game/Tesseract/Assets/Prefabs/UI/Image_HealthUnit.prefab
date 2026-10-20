@@ -89,12 +89,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c3a553c5505fd034d8a16308246e3131, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  empty: {fileID: 963336392, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
-  quarterFull: {fileID: -1833415403, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
-  half: {fileID: -1679577128, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
-  quarterEmpty: {fileID: -756935238, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
-  full: {fileID: -691462840, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
-  image: {fileID: 0}
+  sprites:
+  - {fileID: 963336392, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
+  - {fileID: -1833415403, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
+  - {fileID: -1679577128, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
+  - {fileID: -756935238, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
+  - {fileID: -691462840, guid: ee2e1805588977d4494775c6b94e7bea, type: 3}
 --- !u!114 &-6478967629051005824
 MonoBehaviour:
   m_ObjectHideFlags: 0

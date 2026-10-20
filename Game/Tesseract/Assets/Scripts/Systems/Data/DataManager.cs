@@ -1,154 +1,111 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using System.Linq;
+using UnityEngine.Serialization;
 
-
+// Owns the current save profile. When a scene loads, every IDataPersistence in it is filled
+// from the profile; SaveGame collects them back. Survives scene loads, and every scene carries
+// one so it can be played directly: the first instance wins and later ones remove themselves.
 public class DataManager : MonoBehaviour
 {
     [Header("File Storage Settings")]
     [SerializeField] private string fileName;
-    [SerializeField] private bool usingEncryption;
+    [FormerlySerializedAs("usingEncryption")]
+    [SerializeField] private bool useObfuscation; // see FileDataHandler: not encryption
 
     [Header("Settings For Testing")]
-    [SerializeField] private bool disableDataPersistence = false;
+    [SerializeField] private bool disableDataPersistence;
 
+    private FileDataHandler files;
     private GameData gameData;
-    private List<IDataPersistence> dataPersistentObjects;
-    private FileDataHandler dataHandler;
-    private string currentDataProfileID = "";
+    private List<IDataPersistence> persistent = new List<IDataPersistence>();
+    private float playtimeMark; // Time.unscaledTime when playtime was last banked
 
     public static DataManager Current { get; private set; }
-    public string CurrentDataProfileID { get => currentDataProfileID; }
+    public string CurrentDataProfileID { get; private set; }
 
-    public GameData GetGameData()
-    {
-        return gameData;
-    }
+    public GameData GetGameData() => gameData;
 
     private void Awake()
     {
-        if (disableDataPersistence)
-            Debug.LogWarning("Data persistence is disabled, no data will be loaded or saved!");
-
-        if (Current == null)
-            Current = this;
-        else
+        if (Current != null)
         {
-            Debug.LogWarning("Data Manager instance already exists, newest one will be destroyed");
-            Destroy(this.gameObject);
+            Destroy(gameObject);
             return;
         }
-        DontDestroyOnLoad(this.gameObject);
 
-        this.dataHandler = new FileDataHandler(Application.persistentDataPath, fileName, usingEncryption);
-        this.currentDataProfileID = dataHandler.GetMostRecentDataProfileID();
+        Current = this;
+        DontDestroyOnLoad(gameObject);
+        if (disableDataPersistence) Debug.LogWarning("Data persistence is disabled: nothing will be loaded or saved.");
+
+        files = new FileDataHandler(Application.persistentDataPath, fileName, useObfuscation);
+        CurrentDataProfileID = files.GetMostRecentDataProfileID();
     }
 
-    private void OnEnable()
-    {
-        SceneManager.sceneLoaded += OnSceneLoaded;
-        SceneManager.sceneUnloaded += OnSceneUnloaded;
-    }
+    // There is deliberately no save on sceneUnloaded: by then the scene's objects are
+    // destroyed, so saving there threw. MenuManager.ChangeScene saves before leaving instead.
+    private void OnEnable() => SceneManager.sceneLoaded += OnSceneLoaded;
 
-    private void OnDisable()
-    {
-        SceneManager.sceneLoaded -= OnSceneLoaded;
-        SceneManager.sceneUnloaded -= OnSceneUnloaded;
-    }
-
-    private void Start()
-    {
-        
-    }
+    private void OnDisable() => SceneManager.sceneLoaded -= OnSceneLoaded;
 
     public void NewGame()
     {
-        this.gameData = new GameData();
+        gameData = new GameData();
+        playtimeMark = Time.unscaledTime;
     }
 
     public void SaveGame()
     {
-        if (disableDataPersistence)
-            return;
-
-        if (this.gameData == null)
+        if (disableDataPersistence) return;
+        if (gameData == null)
         {
-            EventManager.Current.NoSaveData();
-            Debug.LogWarning("No data was found, please start a new game before trying to save");
+            Debug.LogWarning("Nothing to save: start a new game first.");
             return;
         }
 
-        foreach (IDataPersistence dataPersistentObj in dataPersistentObjects)
-        {
-            dataPersistentObj.SaveData(gameData);
-        }
-
-        gameData.lastActiveSceneIndex = SceneManager.GetActiveScene().buildIndex;
+        foreach (IDataPersistence target in persistent) target.SaveData(gameData);
         gameData.lastActiveSceneName = SceneManager.GetActiveScene().name;
+        gameData.lastUpdated = DateTime.Now.ToBinary();
 
-        gameData.lastUpdated = System.DateTime.Now.ToBinary();
+        // Playtime is banked here. GameStatistics used to track it but was never attached
+        // to anything, so every save slot showed zero.
+        gameData.totalPlaytime += Time.unscaledTime - playtimeMark;
+        playtimeMark = Time.unscaledTime;
 
-        dataHandler.Save(gameData, currentDataProfileID);
-
-        EventManager.Current.GameSaved();
+        files.Save(gameData, CurrentDataProfileID);
     }
 
     public void LoadGame()
     {
-        if (disableDataPersistence)
-        {
-            EventManager.Current.NoDataPersistence();
-            return;
-        }
+        if (disableDataPersistence) return;
 
-        this.gameData = dataHandler.Load(currentDataProfileID);
-
-        if(this.gameData == null)
+        gameData = files.Load(CurrentDataProfileID);
+        playtimeMark = Time.unscaledTime;
+        // No profile yet, or an unreadable one: the start menu hides Continue and Load on this.
+        if (gameData == null)
         {
             EventManager.Current.NoLoadData();
-            Debug.LogWarning("No data was found, please start a new game before trying to load");
             return;
         }
 
-        foreach(IDataPersistence dataPersistentObj in dataPersistentObjects)
-        {
-            dataPersistentObj.LoadData(gameData);
-        }
+        foreach (IDataPersistence target in persistent) target.LoadData(gameData);
         EventManager.Current.GameLoaded();
     }
 
     public void LoadWithDataProfileID(string dataProfileID)
     {
-        currentDataProfileID = dataProfileID;
+        CurrentDataProfileID = dataProfileID;
         LoadGame();
     }
 
-    public List<IDataPersistence> FindAllDataPersistentObjects()
-    {
-        IEnumerable<IDataPersistence> dataPersistentObjects = FindObjectsByType<MonoBehaviour>().OfType<IDataPersistence>();
-        return new List<IDataPersistence>(dataPersistentObjects);
-    }
+    public Dictionary<string, GameData> GetAllDataProfiles() => files.LoadAllDataProfiles();
 
-    public Dictionary<string, GameData> GetAllDataProfiles()
+    // Searched per scene: each scene brings its own player, dialogue and HUD objects.
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        return dataHandler.LoadAllDataProfiles();
-    }
-
-    public void OnSceneLoaded(Scene scene, LoadSceneMode mode)
-    {
-        this.dataPersistentObjects = FindAllDataPersistentObjects();
-
+        persistent = FindObjectsByType<MonoBehaviour>().OfType<IDataPersistence>().ToList();
         LoadGame();
-    }
-
-    public void OnSceneUnloaded(Scene scene)
-    {
-        SaveGame();
-    }
-
-    private void OnApplicationQuit()
-    {
-        //SaveGame();
     }
 }

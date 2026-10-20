@@ -12,10 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 91024ab58c881b048a6d839f1df34bc6, type: 3}
   m_Name: NPC_Gauss
   m_EditorClassIdentifier: 
-  gameObj: {fileID: 6633016044398957801, guid: 11b901fcfdd40b64cab9e215e8546908, type: 3}
   npName: Gauss
-  dialogue:
-    dialogueJSON: {fileID: 4900000, guid: 93470d919fdb2b14d9780d92b7dbcbdb, type: 3}
+  dialogue: {fileID: 4900000, guid: 93470d919fdb2b14d9780d92b7dbcbdb, type: 3}
   isInteractable: 1
   isHostile: 1
   isFriendly: 0

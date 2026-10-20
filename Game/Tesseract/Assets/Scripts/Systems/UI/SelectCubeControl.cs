@@ -1,75 +1,44 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 
+// The spinning cube that marks the selected menu control. Hidden while a dialogue line is
+// being written, because the selectable then is the invisible finish-line button.
 public class SelectCubeControl : MonoBehaviour
 {
-    public GameObject selectCube;
-    public GameObject currentSelection;
+    private const float RotationSpeed = 90f; // degrees per second, around two axes
 
-    private readonly float rotationSpeed = 90f;
-    public Vector3 offset = new Vector3(-290f, -5, -4f);
+    [SerializeField] private GameObject selectCube;
 
-    public bool isWritingDialogue = false;
+    private bool isWritingDialogue;
 
-    private void Awake()
-    {
-    }
-
+    // Guarded because scenes without dialogue, like a future start menu, still use the cube.
     private void OnEnable()
     {
-        if (DialogueManager.Current != null)
-            DialogueManager.Current.OnWritingLine += IsWritingDialogue;
-        else
-            Debug.LogWarning("Dialogue Manager not found");
+        if (DialogueManager.Current != null) DialogueManager.Current.OnWritingLine += SetWriting;
     }
 
     private void OnDisable()
     {
-        if(DialogueManager.Current != null)
-            DialogueManager.Current.OnWritingLine -= IsWritingDialogue;
+        if (DialogueManager.Current != null) DialogueManager.Current.OnWritingLine -= SetWriting;
     }
 
     private void Update()
     {
-        if (EventSystem.current.currentSelectedGameObject != null)
+        GameObject selected = EventSystem.current.currentSelectedGameObject;
+        bool shown = selected != null && !(isWritingDialogue && IsDialogueButton(selected));
+        selectCube.transform.localScale = shown ? Vector3.one * 4f : Vector3.zero;
+        selectCube.transform.Rotate(RotationSpeed * Time.deltaTime * new Vector3(1f, 0f, 1f));
+
+        if (selected != null)
         {
-            currentSelection = EventSystem.current.currentSelectedGameObject;
-            ChangePosition(currentSelection.transform);
-
-            if (DialogueManager.Current != null)
-            {
-                if (EventSystem.current.currentSelectedGameObject == DialogueManager.Current.ProgressButton || EventSystem.current.currentSelectedGameObject == DialogueManager.Current.ForceLineButton)
-                    SetDialogueVisibility();
-                else
-                    SetVisibility(true);
-            }
+            Vector3 target = selected.transform.position;
+            selectCube.transform.localPosition = new Vector3(target.x, target.y, transform.localPosition.z);
         }
-        else
-            SetVisibility(false);
     }
 
-    private void FixedUpdate()
-    {
-        selectCube.transform.Rotate(rotationSpeed * Time.deltaTime * Vector3.right);
-        selectCube.transform.Rotate(rotationSpeed * Time.deltaTime * Vector3.forward);
-    }
+    private void SetWriting(bool writing) => isWritingDialogue = writing;
 
-    private void ChangePosition(Transform newPosition)
-    {
-        selectCube.transform.localPosition = new Vector3(newPosition.position.x, newPosition.position.y, transform.localPosition.z);
-    }
-
-    private void IsWritingDialogue(bool state)
-    {
-        isWritingDialogue = state;
-    }
-
-    private void SetDialogueVisibility()
-    {
-        selectCube.transform.localScale = !isWritingDialogue ? selectCube.transform.localScale = Vector3.one * 4f : selectCube.transform.localScale = Vector3.zero;
-    }
-    private void SetVisibility(bool state)
-    {
-        selectCube.transform.localScale = state ? selectCube.transform.localScale = Vector3.one * 4f : selectCube.transform.localScale = Vector3.zero;
-    }
+    // Only reached while a line is being written, which only DialogueManager reports, so Current is set.
+    private static bool IsDialogueButton(GameObject selected) =>
+        selected == DialogueManager.Current.ProgressButton || selected == DialogueManager.Current.ForceLineButton;
 }

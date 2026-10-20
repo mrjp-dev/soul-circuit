@@ -1,48 +1,18 @@
-using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
+// Free-form tags saying what kind of thing an object is ("NPC", "Item", allegiances). Unity
+// allows one built-in tag per object, which is already spent on "Interactable".
 public class CustomTag : MonoBehaviour
 {
-    [SerializeField]
-    private List<string> tags = new List<string>();
+    [SerializeField] private List<string> tags = new List<string>();
 
-    public int GetTagIndex(string tagName)
-    {
-        return tags.IndexOf(tagName);
-    }
+    public bool HasTag(string tag) => tags.Contains(tag);
 
-    public bool HasTag(string tag)
+    // Present or absent, never duplicated, so callers can mirror a flag without checking first.
+    public void Set(string tag, bool present)
     {
-        return tags.Contains(tag);
-    }
-
-    public IEnumerable<string> GetTags()
-    {
-        return tags;
-    }
-
-    public void Add(string tagName)
-    {
-        tags.Add(tagName);
-    }
-    public void Remove(string tagName)
-    {
-        tags.Remove(tagName);
-    }
-
-    public void Rename(int index, string tagName)
-    {
-        tags[index] = tagName;
-    }
-
-    public string GetAtIndex(int index)
-    {
-        return tags[index];
-    }
-
-    public int Count
-    {
-        get { return tags.Count; }
+        tags.Remove(tag);
+        if (present) tags.Add(tag);
     }
 }

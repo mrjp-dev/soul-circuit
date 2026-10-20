@@ -1,48 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
 
-public enum HealthUnitStatus
-{
-    Empty = 0,
-    QuarterFull = 1,
-    Half = 2,
-    QuarterEmpty = 3,
-    Full = 4
-}
-
+// One heart of the health bar. A heart holds four quarters of health, so its sprite is
+// chosen by how many quarters are filled: sprites[0] is empty and sprites[4] is full.
+// An array rather than one field per state, so a finer-grained heart is only more sprites.
 public class HealthUnitDisplay : MonoBehaviour
 {
-    [SerializeField] private Sprite empty, quarterFull, half, quarterEmpty, full;
-    [SerializeField] private Image image;
+    [SerializeField] private Sprite[] sprites;
 
-    private void Awake()
-    {
-        image = GetComponent<Image>();
-    }
-
-    public void SetUnitImage(HealthUnitStatus unitStatus)
-    {
-        switch (unitStatus)
-        {
-            case (HealthUnitStatus.Empty):
-                image.sprite = empty;
-                break;
-
-            case (HealthUnitStatus.QuarterFull):
-                image.sprite = quarterFull;
-                break;
-
-            case (HealthUnitStatus.Half):
-                image.sprite = half;
-                break;
-
-            case (HealthUnitStatus.QuarterEmpty):
-                image.sprite = quarterEmpty;
-                break;
-
-            case (HealthUnitStatus.Full):
-                image.sprite = full;
-                break;
-        }
-    }
+    public void SetQuarters(int filled) => GetComponent<Image>().sprite = sprites[filled];
 }

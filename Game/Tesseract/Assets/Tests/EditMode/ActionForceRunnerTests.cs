@@ -1,109 +1,96 @@
 using NUnit.Framework;
 using UnityEngine;
 
-// Characterises the interrupt rules lifted out of PlayerControl. Before the
-// extraction none of this could be reached without a Rigidbody, an Animator and
-// a scene, which is why it had no coverage at all.
+// The interrupt rules behind jump, attack and dash. PlayerControl only applies what the
+// runner decides, so this covers the feel-relevant logic without a Rigidbody or a scene.
 public class ActionForceRunnerTests
 {
+    private static readonly ActionForce Dash = new ActionForce
+    {
+        Name = "Dash",
+        Mode = ForceMode.Impulse,
+        Direction = Vector3.forward,
+        Magnitude = 10f,
+        Duration = 0.5f,
+        LocksMovement = true,
+        LocksGravity = true,
+    };
+
+    // No locks on these two: the interrupt rule keys on Name only, so the tests below must
+    // pass whatever the lock values are.
+    private static readonly ActionForce Attack = new ActionForce { Name = "Attack", Duration = 0.2f };
+    private static readonly ActionForce Jump = new ActionForce { Name = "Jump" }; // duration 0, like the real jump
+
     private ActionForceRunner runner;
 
     [SetUp]
     public void SetUp() => runner = new ActionForceRunner();
 
-    private static ActionForce Dash(bool selfInterruptable = false,
-                                    bool interruptable = true,
-                                    float duration = 0.5f) =>
-        new ActionForce("Dash",
-                        ForceMode.Impulse,
-                        Vector3.forward,
-                        magnitude: 10f,
-                        duration: duration,
-                        isInterruptable: interruptable,
-                        isSelfInterruptable: selfInterruptable,
-                        allowsMovement: false,
-                        allowsGravity: false);
-
     [Test]
-    public void Idle_state_permits_movement_and_gravity()
+    public void Idle_state_leaves_movement_and_gravity_alone()
     {
-        // The trap this guards: default(ActionForce) zeroes both flags, so an
-        // idle state built that way would leave the player unable to move.
-        Assert.IsTrue(runner.Current.AllowsMovement);
-        Assert.IsTrue(runner.Current.AllowsGravity);
         Assert.IsFalse(runner.IsActive);
+        Assert.IsFalse(runner.Current.LocksMovement);
+        Assert.IsFalse(runner.Current.LocksGravity);
     }
 
     [Test]
-    public void Applying_from_idle_succeeds_and_starts_the_timer()
+    public void A_force_applied_from_idle_starts_running()
     {
-        Assert.IsTrue(runner.TryApply(Dash()));
+        Assert.IsTrue(runner.TryApply(Dash));
         Assert.IsTrue(runner.IsActive);
         Assert.AreEqual("Dash", runner.Current.Name);
     }
 
     [Test]
-    public void Retriggering_a_non_self_interruptable_force_is_rejected()
+    public void Retriggering_the_running_force_is_ignored_and_keeps_its_locks()
     {
-        runner.TryApply(Dash(selfInterruptable: false));
+        runner.TryApply(Dash);
 
-        Assert.IsFalse(runner.TryApply(Dash(selfInterruptable: false)),
-            "Attack and dash rely on this to stop button mashing re-firing the impulse.");
+        Assert.IsFalse(runner.TryApply(Dash));
+        // The previous runner cleared Current here, so mashing dash mid-dash regained steering and gravity.
+        Assert.IsTrue(runner.Current.LocksMovement);
+        Assert.IsTrue(runner.Current.LocksGravity);
     }
 
-    // No production force sets this true today. The rule is covered anyway
-    // because it is the only reason IsSelfInterruptable is a field rather than
-    // a hardcoded false, and a future parry or combo step will need it.
+    // Jumping or attacking out of a dash relies on this; PlayerControl zeroes velocity when it happens.
     [Test]
-    public void Retriggering_a_self_interruptable_force_restarts_it()
+    public void A_different_force_interrupts_the_running_one()
     {
-        runner.TryApply(Dash(selfInterruptable: true));
-        runner.Tick(0.4f);
+        runner.TryApply(Dash);
 
-        Assert.IsTrue(runner.TryApply(Dash(selfInterruptable: true)));
-        Assert.IsTrue(runner.IsActive, "the timer should have restarted from zero");
+        Assert.IsTrue(runner.TryApply(Attack));
+        Assert.AreEqual("Attack", runner.Current.Name);
     }
 
+    // PlayerControl fires SetForceEndTrigger on this edge. The original code fired it on every
+    // fixed step while idle, which left the animator parameter permanently raised.
     [Test]
-    public void A_different_force_is_admitted_only_when_the_running_one_allows_it()
+    public void Tick_reports_the_end_exactly_once_then_returns_to_idle()
     {
-        runner.TryApply(Dash(interruptable: true));
-        Assert.IsTrue(runner.TryApply(new ActionForce("Attack", duration: 0.2f)));
+        runner.TryApply(Dash);
 
-        // Fresh runner: the first half already consumed the dash by
-        // interrupting it, and Previous now names Attack.
-        runner = new ActionForceRunner();
-        runner.TryApply(Dash(interruptable: false));
-        Assert.IsFalse(runner.TryApply(new ActionForce("Attack", duration: 0.2f)));
-    }
-
-    [Test]
-    public void Tick_reports_the_end_exactly_once()
-    {
-        runner.TryApply(Dash(duration: 0.5f));
-
-        // Tick is edge-triggered so SetForceEndTrigger fires once per force.
         Assert.IsFalse(runner.Tick(0.4f));
         Assert.IsTrue(runner.Tick(0.2f), "0.6s of a 0.5s force must end it");
-        Assert.IsFalse(runner.Tick(0.2f),
-            "a second report would re-fire the animation trigger every frame");
+        Assert.IsFalse(runner.Tick(0.2f), "a second report would refire the animation trigger");
+        Assert.IsFalse(runner.Current.LocksMovement);
     }
 
     [Test]
-    public void An_ended_force_returns_the_runner_to_the_permissive_idle_state()
+    public void The_same_force_is_accepted_again_once_it_has_ended()
     {
-        runner.TryApply(Dash(duration: 0.1f));
-        runner.Tick(0.2f);
+        runner.TryApply(Dash);
+        runner.Tick(0.6f);
 
-        Assert.IsTrue(runner.Current.AllowsMovement);
-        Assert.IsTrue(runner.Current.AllowsGravity);
+        Assert.IsTrue(runner.TryApply(Dash));
     }
 
     [Test]
-    public void A_zero_duration_force_applies_without_ever_becoming_active()
+    public void A_zero_duration_force_never_blocks_the_next_one()
     {
-        // Jump is built with duration 0, so it must never block a later force.
-        Assert.IsTrue(runner.TryApply(new ActionForce("Jump", duration: 0f)));
+        // Jump is built with duration 0, so jumping again or dashing straight after must work.
+        Assert.IsTrue(runner.TryApply(Jump));
         Assert.IsFalse(runner.IsActive);
+        Assert.IsTrue(runner.TryApply(Jump));
     }
 }

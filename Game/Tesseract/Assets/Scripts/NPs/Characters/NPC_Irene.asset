@@ -12,10 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 91024ab58c881b048a6d839f1df34bc6, type: 3}
   m_Name: NPC_Irene
   m_EditorClassIdentifier: 
-  gameObj: {fileID: 0}
   npName: Irene
-  dialogue:
-    dialogueJSON: {fileID: 4900000, guid: d429ff789e5684844afbdb96758e8897, type: 3}
+  dialogue: {fileID: 4900000, guid: d429ff789e5684844afbdb96758e8897, type: 3}
   isInteractable: 1
   isHostile: 0
   isFriendly: 0

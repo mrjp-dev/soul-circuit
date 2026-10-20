@@ -1,10 +1,10 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
+// One save slot button on the start menu. The id names the slot's folder on disk, so
+// renaming it orphans that slot's existing save.
 public class SaveDataProfile : MonoBehaviour
 {
     [Header("Data Profiles")]
@@ -12,39 +12,13 @@ public class SaveDataProfile : MonoBehaviour
     [SerializeField] private TextMeshProUGUI dataProfileNameText;
     [SerializeField] private TextMeshProUGUI dataProfileTimeText;
 
-    private bool hasData;
-
-    private Button saveButton;
-
-    public bool HasData { get => hasData; }
-
-    private void Awake()
-    {
-        saveButton = GetComponent<Button>();
-    }
+    public string GetDataProfileID() => dataProfileID;
 
     public void SetData(GameData data)
     {
-        if (data == null)
-        {
-            dataProfileNameText.text = "New Save";
-            dataProfileTimeText.text = "";
-        }
-        else
-        {
-            hasData = true;
-            dataProfileNameText.text = dataProfileID;
-            dataProfileTimeText.text = TimeSpan.FromSeconds(data.totalPlaytime).ToString("c");
-        }
+        dataProfileNameText.text = data == null ? "New Save" : dataProfileID;
+        dataProfileTimeText.text = data == null ? "" : TimeSpan.FromSeconds(data.totalPlaytime).ToString("c");
     }
 
-    public string GetDataProfileID()
-    {
-        return dataProfileID;
-    }
-
-    public void SetInteractable(bool state)
-    {
-        saveButton.interactable = state;
-    }
+    public void SetInteractable(bool state) => GetComponent<Button>().interactable = state;
 }

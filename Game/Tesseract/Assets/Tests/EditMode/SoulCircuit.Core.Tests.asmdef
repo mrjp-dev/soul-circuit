@@ -1,11 +1,13 @@
 {
-    "name": "SoulCircuit.Game.Tests",
+    "name": "SoulCircuit.Core.Tests",
     "rootNamespace": "",
     "references": [
-        "SoulCircuit.Game",
+        "SoulCircuit.Core",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.InputSystem.TestFramework",
+        "Ink-Libraries"
     ],
     "includePlatforms": [
         "Editor"

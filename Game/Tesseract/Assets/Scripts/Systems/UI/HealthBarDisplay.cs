@@ -1,23 +1,18 @@
-using System.Collections.Generic;
 using UnityEngine;
 
+// Draws one heart per four points of max health and redraws whenever health or a loaded
+// save changes it.
 public class HealthBarDisplay : MonoBehaviour
 {
-    public GameObject healthBar;
+    private const int QuartersPerHeart = 4;
 
-    [SerializeField] private GameObject healthUnit;
+    [SerializeField] private GameObject healthUnit; // prefab with a HealthUnitDisplay
     [SerializeField] private PlayerData pData;
-    List<HealthUnitDisplay> healthUnitsList = new List<HealthUnitDisplay>();
 
     private void OnEnable()
     {
-        if (EventManager.Current != null)
-        {
-            EventManager.Current.OnPlayerDrawHealth += DrawUnits;
-            EventManager.Current.OnGameLoaded += DrawUnits;
-        }
-        else
-            Debug.LogError("Event Manager not found");
+        EventManager.Current.OnPlayerDrawHealth += DrawUnits;
+        EventManager.Current.OnGameLoaded += DrawUnits;
     }
 
     private void OnDisable()
@@ -26,46 +21,18 @@ public class HealthBarDisplay : MonoBehaviour
         EventManager.Current.OnGameLoaded -= DrawUnits;
     }
 
-    private void Start()
-    {
-        DrawUnits();
-    }
+    private void Start() => DrawUnits();
 
-    public void DrawUnits()
+    private void DrawUnits()
     {
-        ClearUnits();
+        foreach (Transform heart in transform) Destroy(heart.gameObject);
 
-        float maxHealthRemainder = pData.MaxHealth % 4;
-        int unitsToInstance = Mathf.CeilToInt((pData.MaxHealth / 4) + maxHealthRemainder);
-        for(int i = 0; i < unitsToInstance; i++)
+        // Rounds up. The old count was max/4 + max%4, so 14 max health drew 5 hearts.
+        int hearts = (pData.MaxHealth + QuartersPerHeart - 1) / QuartersPerHeart;
+        for (int i = 0; i < hearts; i++)
         {
-            InstantiateUnit(HealthUnitStatus.Empty);
+            int filled = Mathf.Clamp(pData.Health - i * QuartersPerHeart, 0, QuartersPerHeart);
+            Instantiate(healthUnit, transform).GetComponent<HealthUnitDisplay>().SetQuarters(filled);
         }
-
-        for(int i = 0; i < healthUnitsList.Count; i++)
-        {
-            int healthRemainder = (int) Mathf.Clamp(pData.Health - (i * 4), 0, 4);
-            healthUnitsList[i].SetUnitImage((HealthUnitStatus)healthRemainder);
-        }
-    }
-
-    public void InstantiateUnit(HealthUnitStatus status)
-    {
-        GameObject newUnit = Instantiate(healthUnit);
-        newUnit.transform.SetParent(transform);
-        newUnit.transform.localScale = Vector3.one;
-
-        HealthUnitDisplay unitDisplayComponent = newUnit.GetComponent<HealthUnitDisplay>();
-        unitDisplayComponent.SetUnitImage(status);
-        healthUnitsList.Add(unitDisplayComponent);
-    }
-
-    public void ClearUnits()
-    {
-        foreach(Transform t in transform)
-        {
-            Destroy(t.gameObject);
-        }
-        healthUnitsList = new List<HealthUnitDisplay>();
     }
 }

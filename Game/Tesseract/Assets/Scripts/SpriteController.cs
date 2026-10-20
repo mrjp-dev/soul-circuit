@@ -1,12 +1,9 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+// Keeps a sprite upright while its parent turns: the parent's rotation is for physics and
+// steering, and the sprite must never show it. LateUpdate, after every parent has moved,
+// so no frame renders the sprite mid-turn; it ran in FixedUpdate before.
 public class SpriteController : MonoBehaviour
 {
-    private Quaternion defaultOrientationQuaternion = Quaternion.Euler(0f, 0f, 0f);
-    private void FixedUpdate()
-    {
-        transform.rotation = defaultOrientationQuaternion;
-    }
+    private void LateUpdate() => transform.rotation = Quaternion.identity;
 }

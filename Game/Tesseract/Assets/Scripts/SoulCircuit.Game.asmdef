@@ -2,12 +2,11 @@
     "name": "SoulCircuit.Game",
     "rootNamespace": "",
     "references": [
+        "SoulCircuit.Core",
         "Unity.InputSystem",
         "Unity.TextMeshPro",
         "UnityEngine.UI",
         "Unity.Cinemachine",
-        "Unity.VisualScripting.Core",
-        "Unity.VisualScripting.Flow",
         "Ink-Libraries"
     ],
     "includePlatforms": [],

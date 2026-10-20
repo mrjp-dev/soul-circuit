@@ -1,31 +1,21 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
+// Stretches the camera's vertical axis by sqrt(2), which is 1/sin(45 degrees): it undoes the
+// foreshortening of a camera tilted 45 degrees, so the pixel art keeps square pixels.
 [ExecuteInEditMode]
 [RequireComponent(typeof(Camera))]
 public class CameraController : MonoBehaviour
 {
-    [SerializeField, HideInInspector]
-    Camera _camera;
+    [SerializeField, HideInInspector] private Camera _camera;
 
-    void OnValidate() {
-        TryGetComponent(out _camera);
-    }
+    private void OnValidate() => TryGetComponent(out _camera);
 
-    // Technically this only needs to happen once at start-up,
-    // or when the window is being resized, but it's cheap
-    // enough to do every frame in the absence of a built-in
-    // OnProjectionChanged event.
-    void LateUpdate() {
-        // Get the default projection matrix for this camera.
+    // Every frame because Unity has no projection-changed event, and it costs next to nothing.
+    private void LateUpdate()
+    {
         _camera.ResetProjectionMatrix();
-        var mat = _camera.projectionMatrix;
-
-        // Scale the vertical axis by 1/sin(angle).
-        mat[1, 1] *= Mathf.Sqrt(2);
-
-        // Use our modified matrix.
-        _camera.projectionMatrix = mat;
+        Matrix4x4 projection = _camera.projectionMatrix;
+        projection[1, 1] *= Mathf.Sqrt(2);
+        _camera.projectionMatrix = projection;
     }
 }
