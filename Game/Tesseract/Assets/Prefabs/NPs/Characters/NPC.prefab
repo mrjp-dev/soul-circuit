@@ -154,4 +154,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 74b8c1e19df07ae419a0e40fa555781a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dataObject: {fileID: 11400000, guid: a304d759dffb2a84fbc17bb20f8c1dfe, type: 2}
+  characterData: {fileID: 11400000, guid: a304d759dffb2a84fbc17bb20f8c1dfe, type: 2}

@@ -14,7 +14,7 @@ to `Game/Tesseract/`.
 | Editor path | `C:\Program Files\Unity\Hub\Editor\6000.5.8f1\Editor\Unity.exe` |
 | Render pipeline | URP **17.5.0**, Linear color space |
 | Input | `activeInputHandler: 2`, so both the legacy Input Manager and the Input System are live |
-| Scenes in build | 1 (`Assets/Scenes/Testing.unity`), of 32 on disk |
+| Scenes in build | 1 (`Assets/Scenes/Testing.unity`), of 2 on disk (plus 1 vendored example) |
 
 Unity 6.5 writes its editor log to `Logs/Editor.log` inside the project by default, not the
 old per-user location.
@@ -91,7 +91,7 @@ preserves every GUID, so settings assets and scene references survive.
 
 ## Code layout
 
-Game code: **36 files, 1,650 lines** under `Assets/Scripts`. Everything else under `Assets/` is vendored.
+Game code: **36 files, 1,682 lines** under `Assets/Scripts`. Everything else under `Assets/` is vendored.
 
 | Assembly | Folder | Holds |
 |---|---|---|

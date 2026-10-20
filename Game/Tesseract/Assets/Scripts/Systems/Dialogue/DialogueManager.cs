@@ -49,8 +49,9 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
         if (Current == null) Current = this;
         else Debug.LogError("A second DialogueManager exists; only the first one is used.");
 
-        choiceTexts = Array.ConvertAll(choices, choice => choice.GetComponentInChildren<TextMeshProUGUI>());
+        choiceTexts = Array.ConvertAll(choices, choice => choice.GetComponentInChildren<TextMeshProUGUI>(true));
 
+        // The dialogue panel is saved inactive, so the lookup above must include inactive objects.
         // Defaults until a save is loaded. The old code only set these when persistence was
         // disabled, so a first run with no save hit a null reference on the first conversation.
         globals = new DialogueVariables(loadGlobalVariablesJSON.text, null);
@@ -72,6 +73,7 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
     public void StartDialogue(GameObject interactable)
     {
+        Abandon();
         speaker = interactable.GetComponent<NonPlayable>();
         if (speaker.Data.Dialogue == null)
         {
@@ -130,6 +132,17 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
     // Wired to the finish-line button: shows the rest of the line at once.
     public void ForceFinishLine() => skipRequested = true;
+
+    // Cancel closes the panel without going through EndDialogue, leaving the old line still
+    // writing. Without this, talking again before it finished ended the new conversation at
+    // once and the stale coroutine then read a null story.
+    private void Abandon()
+    {
+        StopAllCoroutines();
+        if (story != null) globals.StopListening(story);
+        isWriting = false;
+        skipRequested = false;
+    }
 
     private void EndDialogue()
     {

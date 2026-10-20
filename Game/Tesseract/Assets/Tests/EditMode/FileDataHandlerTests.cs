@@ -105,9 +105,11 @@ public class FileDataHandlerTests
     [Test]
     public void The_most_recently_saved_profile_wins()
     {
-        Handler().Save(new GameData { lastUpdated = new DateTime(2026, 1, 1).ToBinary() }, "old");
-        Handler().Save(new GameData { lastUpdated = new DateTime(2026, 6, 1).ToBinary() }, "new");
+        // Newest sorts in the middle, so neither first nor last folder can pass by accident.
+        Handler().Save(new GameData { lastUpdated = new DateTime(2026, 1, 1).ToBinary() }, "a");
+        Handler().Save(new GameData { lastUpdated = new DateTime(2026, 6, 1).ToBinary() }, "m");
+        Handler().Save(new GameData { lastUpdated = new DateTime(2026, 3, 1).ToBinary() }, "z");
 
-        Assert.AreEqual("new", Handler().GetMostRecentDataProfileID());
+        Assert.AreEqual("m", Handler().GetMostRecentDataProfileID());
     }
 }

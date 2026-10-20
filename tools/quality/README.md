@@ -17,7 +17,7 @@ Compiler gates live in `csc.rsp` beside each game asmdef (`Assets/Scripts`, `Ass
 
 ## Gates
 
-Measured on the code at the time the gates were set (36 game files, 1,650 lines, 183 methods).
+Measured on the code at the time the gates were set (36 game files, 1,650 lines, 183 methods; figures drift as code changes, the gates do not).
 
 | Gate | Threshold | Measured | Proposed | Why it changed |
 |---|---|---|---|---|

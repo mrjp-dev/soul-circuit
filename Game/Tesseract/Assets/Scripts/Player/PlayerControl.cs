@@ -201,6 +201,9 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
 
     private void ApplyActionForce(ActionForce force, Action animate)
     {
+        // The animation plays even when the force is refused, as it always has: mashing attack
+        // restarts the swing without restarting the impulse.
+        animate();
         bool interrupting = forces.IsActive;
         if (!forces.TryApply(force)) return;
 
@@ -209,7 +212,6 @@ public class PlayerControl : MonoBehaviour, IDataPersistence
         if (interrupting) body.linearVelocity = Vector3.zero;
 
         body.AddForce(transform.TransformDirection(force.Direction) * force.Magnitude, force.Mode);
-        animate();
     }
 
 #if UNITY_EDITOR
