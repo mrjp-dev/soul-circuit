@@ -13,6 +13,8 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 {
     public static DialogueManager Current { get; private set; }
 
+    private static readonly int DefaultPortrait = Animator.StringToHash("default");
+
     [SerializeField] private GameObject[] choices;
     [SerializeField] private GameObject progressButton;
     [SerializeField] private GameObject forceLineButton;
@@ -87,7 +89,7 @@ public class DialogueManager : MonoBehaviour, IDataPersistence
 
         textDialogue.text = "";
         textDialogueSource.text = speaker.Data.NpName;
-        portraitAnimator.Play("default");
+        portraitAnimator.Play(DefaultPortrait);
         DisplayNextLine();
     }
 

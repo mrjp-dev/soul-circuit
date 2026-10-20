@@ -71,12 +71,11 @@ compile failures, so grep the log.
 
 Then check `Logs/compile.log` for `error CS`, `warning CS`, and `Aborting batchmode`.
 
-Tests (there are currently **none**, so this exists for when they are added):
+Quality gates, tests and coverage (see `tools/quality/README.md` for every threshold and why):
 
 ```bash
-"C:/Program Files/Unity/Hub/Editor/6000.5.8f1/Editor/Unity.exe" -runTests -batchmode \
-  -projectPath "E:/Projects/Soul Circuit/Game/Tesseract" \
-  -testPlatform EditMode -testResults ./Logs/TestResults-EditMode.xml -logFile -
+uv run tools/quality/check.py            # static gates; also the pre-commit hook
+uv run tools/quality/check.py --unity    # + EditMode tests, Core coverage 100%, CRAP
 ```
 
 Unity holds a lock on the project, so only one editor process at a time. Kill any running
@@ -92,21 +91,28 @@ preserves every GUID, so settings assets and scene references survive.
 
 ## Code layout
 
-Game code is small: **32 files, 3,153 LOC** under `Assets/Scripts`, split into `NPs/`,
-`Player/`, and `Systems/`. Everything else under `Assets/` is vendored.
+Game code: **36 files, 1,650 lines** under `Assets/Scripts`. Everything else under `Assets/` is vendored.
 
-It has **no assembly definition**, so it all compiles into `Assembly-CSharp` and every edit
-recompiles the lot. The 9 `.asmdef` files in the project all belong to third parties.
+| Assembly | Folder | Holds |
+|---|---|---|
+| `SoulCircuit.Core` | `Assets/Scripts/Core` | Plain C#, no MonoBehaviours: action forces, saves, Ink globals, input bindings. Gated at 100% coverage. |
+| `SoulCircuit.Game` | `Assets/Scripts` (rest) | MonoBehaviours and ScriptableObjects: `NPs/`, `Player/`, `Systems/`. |
+| `SoulCircuit.Core.Tests` | `Assets/Tests/EditMode` | EditMode tests for Core. |
 
-There are **no tests**.
+Logic worth testing goes in Core; components stay thin wiring.
 
-Five managers use an ad-hoc static singleton with inconsistent casing, worth knowing before
-you follow the pattern:
+Singletons are `static Current { get; private set; }` on `PlayerControl`, `MenuManager`,
+`DataManager`, `DialogueManager`, `EventManager`. Script execution order (`.cs.meta`) wakes
+`DataManager` (-800), `EventManager` (-500), `MenuManager` (-200) and `DialogueManager` (-150)
+first, so default-order components may subscribe in `OnEnable` without null checks.
 
-- `PlayerControl.Current`, `MenuManager.Current`
-- `DataManager.current`, `DialogueManager.current`, `EventManager.current`
+Menus are modular: a panel needs a `MenuPanel` (its default focus) and a slot in
+`MenuManager.menuList`, in `MenuId` order. Scene buttons pass `MenuId` as a raw int.
 
-`PlayerControl.cs` is 751 LOC and about a quarter of all game code.
+Methods wired to scene buttons by name (renaming breaks the scene silently):
+`EventManager.Back`, `MenuManager.OpenMenu/ExitGame/ChangeScene`,
+`DialogueManager.MakeChoice/DisplayNextLine/ForceFinishLine`,
+`StartMenuControl.LoadWithSaveProfile`.
 
 ## Unity 6.5 gotchas already hit here
 

@@ -17,7 +17,7 @@ only the vocabulary the codebase needs, so names in issues, tests, and refactors
 Each has a paired `ScriptableObject` for data: `NPData`, `NPCData`, `NPOData`.
 
 An **item** is a non-playable object the player can pick up. Pickup is not implemented
-yet: the branch in `PlayerControl.TriggerInteraction` logs and falls through.
+yet: `PlayerInteraction.Interact` logs a warning for items.
 
 `NPCData` carries allegiance as three independent booleans (`isHostile`, `isFriendly`,
 `isNeutral`), so a character can currently be more than one at once.

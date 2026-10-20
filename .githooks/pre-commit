@@ -1,0 +1,4 @@
+#!/bin/sh
+# Static quality gates only: the Unity gates need the editor closed and take a minute.
+# Skip once with: git commit --no-verify
+exec uv run tools/quality/check.py
